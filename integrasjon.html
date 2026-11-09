@@ -1,0 +1,14 @@
+<!-- LIM INN I HOVEDSIDENS <body>, FOR EKSEMPEL RETT FÃ˜R </body> -->
+<!-- Forutsetter at klokkeverktÃ¸yet ligger pÃ¥ /klokker/ pÃ¥ samme domene. -->
+<button type="button" id="opsixToolsOpen" class="opsix-tools-launcher">â—´ StÃ¸tteverktÃ¸y</button>
+<div id="opsixToolsBackdrop" class="opsix-tools-backdrop" hidden></div>
+<aside id="opsixToolsPanel" class="opsix-tools-panel" aria-label="KlokkeverktÃ¸y" aria-hidden="true">
+  <div class="opsix-tools-toolbar">
+    <strong>OPSIX â€“ KlokkeverktÃ¸y</strong>
+    <button id="opsixToolsPopout" type="button">â†— Eget vindu</button>
+    <button id="opsixToolsClose" type="button" aria-label="Lukk sidepanel">âœ•</button>
+  </div>
+  <iframe id="opsixToolsFrame" src="/klokker/" title="KlokkeverktÃ¸y"></iframe>
+</aside>
+<link rel="stylesheet" href="/klokker/panel.css">
+<script src="/klokker/panel.js" defer></script>
