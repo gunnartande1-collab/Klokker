@@ -1,65 +1,75 @@
 (() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const tabs = [...document.querySelectorAll('[data-tab]')];
-  const modeButtons = [...document.querySelectorAll('[data-mode]')];
-  const fmt2 = n => String(Math.max(0, Math.floor(n))).padStart(2,'0');
-  const fmtCountdown = ms => { const s=Math.ceil(Math.max(0,ms)/1000);return `${fmt2(Math.floor(s/60))}:${fmt2(s%60)}`; };
-  const fmtStop = ms => { const s=Math.floor(Math.max(0,ms)/1000);return `${fmt2(Math.floor(s/3600))}:${fmt2(Math.floor(s/60)%60)}:${fmt2(s%60)}`; };
-  const clamp = (n,min,max)=> Math.max(min,Math.min(max,Number.isFinite(n)?n:min));
-  let audio=null;
-  const getAudio=()=>{ try { audio ||= new (window.AudioContext||window.webkitAudioContext)(); if(audio.state==='suspended')audio.resume().catch(()=>{});return audio; }catch{return null;} };
-  function beep(time, freq=880, duration=.065, gain=.15){
-    const a=getAudio(); if(!a)return;
-    try{const osc=a.createOscillator(),v=a.createGain();osc.type='sine';osc.frequency.value=freq;v.gain.setValueAtTime(.0001,time);v.gain.exponentialRampToValueAtTime(gain,time+.006);v.gain.exponentialRampToValueAtTime(.0001,time+duration);osc.connect(v).connect(a.destination);osc.start(time);osc.stop(time+duration+.01);}catch{}
-  }
-  const state={
-    metro:{running:false,mode:'voksen',bpm:110,next:0,step:0},
-    count:{running:false,remaining:180000,endsAt:0,initial:180000,finished:false},
-    stop:{running:false,elapsed:0,startedAt:0},
-    breaths:[]
-  };
-  const modes={voksen:{bpm:110,desc:'Voksen: 100–120 kompresjoner/min. Standard 110 BPM.'},barn:{bpm:110,desc:'Barn: 100–120 kompresjoner/min. Følg aktuell HLR-prosedyre.'},spedbarn:{bpm:110,desc:'Spedbarn (utenfor fødsel): 100–120 kompresjoner/min. Følg aktuell HLR-prosedyre.'},nyfodt:{bpm:120,desc:'Nyfødtresuscitering ved fødsel: 3 kompresjoner + 1 ventilasjon, gjentatt 30 ganger/min (90 kompresjoner og 30 ventilasjoner). Ulik tone markerer ventilasjon.'}};
-  function showTab(id){tabs.forEach(b=>{const selected=b.dataset.tab===id;b.classList.toggle('active',selected);b.setAttribute('aria-selected',String(selected));});document.querySelectorAll('.pane').forEach(p=>{const selected=p.id===id;p.hidden=!selected;p.classList.toggle('active',selected);});}
-  tabs.forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
-  $('openWindow').addEventListener('click',()=>{const url=new URL(location.href);window.open(url.href,'_blank','width=430,height=760,resizable=yes,scrollbars=yes');});
-  function setMode(mode){state.metro.mode=mode;state.metro.bpm=modes[mode].bpm;state.metro.step=0;modeButtons.forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').innerHTML=mode==='nyfodt'?'3:1 <span>HLR</span>':`${state.metro.bpm} <span>BPM</span>`;$('metronomeHint').textContent=modes[mode].desc;if(state.metro.running)state.metro.next=getAudio()?.currentTime||0;}
-  modeButtons.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
-  function updateBpm(v){if(state.metro.mode==='nyfodt')return;state.metro.bpm=clamp(parseInt(v,10),100,120);$('bpmInput').value=state.metro.bpm;$('bpmLabel').innerHTML=`${state.metro.bpm} <span>BPM</span>`;if(state.metro.running)state.metro.next=getAudio()?.currentTime||0;}
-  $('bpmDown').addEventListener('click',()=>updateBpm(state.metro.bpm-5));$('bpmUp').addEventListener('click',()=>updateBpm(state.metro.bpm+5));$('bpmInput').addEventListener('change',e=>updateBpm(e.target.value));
-  $('metroStart').addEventListener('click',()=>{const a=getAudio();if(!a)return alert('Nettleseren støtter ikke lydfunksjonen.');state.metro.running=true;state.metro.next=a.currentTime+.05;state.metro.step=0;render();});
-  $('metroPause').addEventListener('click',()=>{state.metro.running=false;render();});
-  $('metroReset').addEventListener('click',()=>{state.metro.running=false;setMode('voksen');render();});
-  // Web Audio look-ahead: planlegger lydtikk i lydklokken, ikke med setInterval som taktkilde.
-  function scheduleMetro(){const m=state.metro,a=audio;if(!m.running||!a||a.state!=='running')return;const interval=m.mode==='nyfodt'?.5:60/m.bpm;let n=0;while(m.next<a.currentTime+.12 && n++<8){const isVent=m.mode==='nyfodt'&&m.step%4===3;beep(Math.max(m.next,a.currentTime+.005),isVent?510:890,isVent?.16:.065,isVent?.22:.13);m.next+=interval;m.step++;}if(m.next<a.currentTime-.25)m.next=a.currentTime+.02;}
-  function countRemaining(){return state.count.running?Math.max(0,state.count.endsAt-Date.now()):state.count.remaining;}
-  function updateCountInputs(){const m=clamp(parseInt($('countMinutes').value,10)||0,0,999),s=clamp(parseInt($('countSeconds').value,10)||0,0,59);$('countMinutes').value=m;$('countSeconds').value=s;state.count.initial=(m*60+s)*1000;if(!state.count.running){state.count.remaining=state.count.initial;state.count.finished=false;}render();}
-  $('countMinutes').addEventListener('change',updateCountInputs);$('countSeconds').addEventListener('change',updateCountInputs);
-  $('countStart').addEventListener('click',()=>{const c=state.count;if(c.running)return;if(c.remaining<=0){updateCountInputs();if(c.remaining<=0)return;}getAudio();c.endsAt=Date.now()+c.remaining;c.running=true;c.finished=false;render();});
-  $('countPause').addEventListener('click',()=>{const c=state.count;if(c.running){c.remaining=countRemaining();c.running=false;}render();});
-  $('countReset').addEventListener('click',()=>{const c=state.count;c.running=false;c.remaining=c.initial;c.finished=false;render();});
-  $('stopStart').addEventListener('click',()=>{const s=state.stop;if(s.running)return;s.startedAt=Date.now();s.running=true;render();});
-  $('stopPause').addEventListener('click',()=>{const s=state.stop;if(s.running){s.elapsed+=Date.now()-s.startedAt;s.running=false;}render();});
-  $('stopReset').addEventListener('click',()=>{state.stop.running=false;state.stop.elapsed=0;state.stop.startedAt=0;render();});
-  $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render();});
-  $('breathReset').addEventListener('click',()=>{state.breaths=[];render();});
-  function render(){
-    const now=Date.now(),c=state.count,s=state.stop,met=state.metro;
-    if(c.running&&countRemaining()<=0){c.remaining=0;c.running=false;c.finished=true;const a=getAudio();if(a&&a.state==='running'){[0,.28,.56].forEach(t=>beep(a.currentTime+.03+t,760,.17,.22));}}
-    $('countDisplay').textContent=fmtCountdown(countRemaining());$('countState').textContent=c.finished?'Ferdig':c.running?'Nedtelling pågår':'Klar / pauset';
-    const stopMs=s.elapsed+(s.running?now-s.startedAt:0);$('stopDisplay').textContent=fmtStop(stopMs);$('stopState').textContent=s.running?'Stoppeklokke pågår':stopMs?'Pauset':'Klar';
-    $('countMinutes').disabled=c.running;$('countSeconds').disabled=c.running;
-    $('metroStart').disabled=met.running;$('metroPause').disabled=!met.running;$('countStart').disabled=c.running;$('countPause').disabled=!c.running;$('stopStart').disabled=s.running;$('stopPause').disabled=!s.running;
-    $('countBadge').hidden=!(c.running||c.finished);$('countBadge').textContent=c.finished?'FERDIG':fmtCountdown(countRemaining());
-    $('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(stopMs);
-    const breaths=state.breaths;$('breathCount').textContent=breaths.length;
-    // Intervallbasert estimat: første to pust og minst 10 s observasjon før foreløpig RF.
-    if(breaths.length>=2 && now-breaths[0]>=10000){const intervals=(breaths[breaths.length-1]-breaths[0])/(breaths.length-1);$('breathRate').textContent=intervals>0?Math.round(60000/intervals):'–';$('breathHint').textContent='Foreløpig intervallbasert estimat. Tell helst i 60 sekunder; vurder også pustemønster og pustekvalitet.';}
-    else {$('breathRate').textContent='–';$('breathHint').textContent=breaths.length?'Fortsett å registrere pust. Estimat vises etter minst 2 pust og 10 sekunders observasjon.':'Tell helst i 60 sekunder for å vurdere respirasjonsfrekvens. Observer også pustemønster og pustekvalitet.';}
-    const active=[met.running?'Metronom':'',c.running?'Nedtelling':'',s.running?'Stoppeklokke':''].filter(Boolean);$('activityText').textContent=active.length?`Aktiv: ${active.join(', ')}`:'Ingen aktive klokker';document.querySelector('.live-dot').classList.toggle('on',!!active.length);
-  }
-  // De visuelle tallene beregnes fra reell tid selv om nettleseren forsinker oppdateringene.
-  setInterval(()=>{scheduleMetro();render();},50);
-  window.addEventListener('beforeunload',e=>{if(state.metro.running||state.count.running||state.stop.running){e.preventDefault();e.returnValue='';}});
-  setMode('voksen');render();
+'use strict';
+const $=id=>document.getElementById(id);
+const CONFIG={
+  // SETT INN faktisk URL til din EKSISTERENDE helikoptervarsling, ikke lag en duplikat.
+  helicopterUrl:'',
+  feedbackUrl:'mailto:b32838@ous-hf.no?subject=Tilbakemelding%20OPSIX%20klokkeverkt%C3%B8y'
+};
+const fmt2=n=>String(Math.max(0,Math.floor(n))).padStart(2,'0');
+const fmtCount=ms=>{let s=Math.ceil(Math.max(0,ms)/1000);return `${fmt2(Math.floor(s/60))}:${fmt2(s%60)}`};
+const fmtStop=ms=>{let s=Math.floor(Math.max(0,ms)/1000);return `${fmt2(s/3600)}:${fmt2(s/60)%60}:${fmt2(s%60)}`};
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number.isFinite(n)?n:a));
+let audio;
+function getAudio(){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{});return audio}catch{return null}}
+function tone(time,frequency=800,duration=.08,volume=.12,type='sine'){
+ const a=getAudio();if(!a)return;try{const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=frequency;g.gain.setValueAtTime(.0001,time);g.gain.exponentialRampToValueAtTime(volume,time+.009);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g).connect(a.destination);o.start(time);o.stop(time+duration+.02)}catch{}
+}
+function melody(){const a=getAudio();if(a&&a.state==='running')[[0,523],[.20,659],[.40,784]].forEach(([d,f])=>tone(a.currentTime+.02+d,f,.23,.1,'sine'))}
+function alarm(){const a=getAudio();if(a&&a.state==='running')[[0,840],[.26,840],[.52,840]].forEach(([d,f])=>tone(a.currentTime+.02+d,f,.15,.18,'triangle'))}
+const state={metro:{running:false,mode:'voksen',bpm:110,next:0,step:0},count:{running:false,remaining:180000,initial:180000,end:0,finished:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],pauseNotified:new Set()};
+const modes={voksen:110,barn:110,spedbarn:110,nyfodt:120};
+const tabs=[...document.querySelectorAll('[data-tab]')];
+function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==id)}
+tabs.forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+$('openWindow').addEventListener('click',()=>window.open(location.href,'_blank','width=460,height=820,resizable=yes,scrollbars=yes'));
+// Fargevalg lagrer bare visningsvalg, ingen pasientdata.
+let saved='natt';try{saved=localStorage.getItem('opsix-clocks-theme')||'natt'}catch{}
+if(!['dag','dempet','natt'].includes(saved))saved='natt';$('theme').value=saved;document.body.dataset.theme=saved;
+$('theme').addEventListener('change',e=>{const v=e.target.value;document.body.dataset.theme=v;try{localStorage.setItem('opsix-clocks-theme',v)}catch{}});
+function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];m.step=0;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();if(m.running&&audio)m.next=audio.currentTime+.03}
+function updateBpmView(){const m=state.metro;$('bpmLabel').innerHTML=m.mode==='nyfodt'?'3:1 <span>HLR</span>':`${m.bpm} <span>BPM</span>`;$('bpmInput').value=m.bpm;$('bpmDirect').value=m.bpm}
+function setBpm(v){const m=state.metro;if(m.mode==='nyfodt')return;m.bpm=clamp(parseInt(v,10),100,120);updateBpmView();if(m.running&&audio)m.next=audio.currentTime+.03}
+document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+$('bpmDown').addEventListener('click',()=>setBpm(state.metro.bpm-1));$('bpmUp').addEventListener('click',()=>setBpm(state.metro.bpm+1));$('bpmInput').addEventListener('change',e=>setBpm(e.target.value));
+$('bpmLabel').addEventListener('click',()=>{if(state.metro.mode==='nyfodt')return;$('bpmLabel').hidden=true;$('bpmDirect').hidden=false;$('bpmDirect').focus();$('bpmDirect').select()});
+function closeBpm(){setBpm($('bpmDirect').value);$('bpmDirect').hidden=true;$('bpmLabel').hidden=false}
+$('bpmDirect').addEventListener('keydown',e=>{if(e.key==='Enter')closeBpm();if(e.key==='Escape'){$('bpmDirect').hidden=true;$('bpmLabel').hidden=false}});$('bpmDirect').addEventListener('blur',()=>{if(!$('bpmDirect').hidden)closeBpm()});
+$('metroStart').addEventListener('click',()=>{let a=getAudio();if(!a){alert('Lyd støttes ikke av denne nettleseren.');return}state.metro.running=true;state.metro.next=a.currentTime+.05;state.metro.step=0;render()});
+$('metroPause').addEventListener('click',()=>{state.metro.running=false;render()});$('metroReset').addEventListener('click',()=>{state.metro.running=false;setMode('voksen');render()});
+let visualTimers=[];
+function flashAt(delay){const id=setTimeout(()=>{if(!state.metro.running)return;const el=$('beatDisplay');el.classList.remove('beat');void el.offsetWidth;el.classList.add('beat');setTimeout(()=>el.classList.remove('beat'),200)},Math.max(0,delay));visualTimers.push(id)}
+function scheduleMetro(){const m=state.metro,a=audio;if(!m.running||!a||a.state!=='running')return;let interval=m.mode==='nyfodt'?.5:60/m.bpm;let n=0;while(m.next<a.currentTime+.10&&n++<5){let vent=m.mode==='nyfodt'&&m.step%4===3;let when=Math.max(m.next,a.currentTime+.005);tone(when,vent?500:880,vent?.16:.065,vent?.18:.14);if(!vent)flashAt((when-a.currentTime)*1000);m.next+=interval;m.step++}if(m.next<a.currentTime-.25)m.next=a.currentTime+.02;visualTimers=visualTimers.filter(id=>id!==undefined).slice(-12)}
+function remaining(){return state.count.running?Math.max(0,state.count.end-Date.now()):state.count.remaining}
+function readCountdown(){const mm=clamp(parseInt($('countMinutes').value,10)||0,0,999),ss=clamp(parseInt($('countSeconds').value,10)||0,0,59);$('countMinutes').value=mm;$('countSeconds').value=ss;state.count.initial=(mm*60+ss)*1000;if(!state.count.running){state.count.remaining=state.count.initial;state.count.finished=false}render()}
+$('countMinutes').addEventListener('change',readCountdown);$('countSeconds').addEventListener('change',readCountdown);
+$('countStart').addEventListener('click',()=>{const c=state.count;if(c.running)return;if(c.remaining<=0){readCountdown();if(c.remaining<=0)return}getAudio();c.end=Date.now()+c.remaining;c.running=true;c.finished=false;render()});
+$('countPause').addEventListener('click',()=>{const c=state.count;if(c.running){c.remaining=remaining();c.running=false}render()});
+$('countReset').addEventListener('click',()=>{const c=state.count;c.running=false;c.remaining=c.initial;c.finished=false;render()});
+for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
+$('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
+$('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
+function todayAt(v){if(!v)return null;const [h,m]=v.split(':').map(Number);if(!Number.isFinite(h)||!Number.isFinite(m))return null;const d=new Date();d.setHours(h,m,0,0);return d.getTime()}
+$('pauseSave').addEventListener('click',()=>{state.pauses=[{type:'Matpause',time:todayAt($('mealTime').value),length:clamp(+$('mealLength').value,1,240)},{type:'Skjermpause',time:todayAt($('screenTime').value),length:clamp(+$('screenLength').value,1,120)}].filter(p=>p.time!==null);state.pauseNotified.clear();getAudio();render()});
+$('pauseReset').addEventListener('click',()=>{state.pauses=[];state.pauseNotified.clear();$('mealTime').value='';$('screenTime').value='';render()});
+$('heliOpen').addEventListener('click',()=>{if(CONFIG.helicopterUrl)window.open(CONFIG.helicopterUrl,'_blank','noopener');else $('heliConfigHint').textContent='Legg inn adressen til eksisterende helikoptervarsling i CONFIG.helicopterUrl i klokker.js.'});
+$('feedbackButton').addEventListener('click',()=>{window.open(CONFIG.feedbackUrl,'_blank','noopener')});
+$('versionButton').addEventListener('click',()=>$('versionDialog').showModal());$('closeVersion').addEventListener('click',()=>$('versionDialog').close());
+function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
+ if(c.running&&remaining()<=0){c.running=false;c.remaining=0;c.finished=true;if(state.options.countSound)alarm()}
+ $('countDisplay').textContent=fmtCount(remaining());$('countState').textContent=c.finished?'FERDIG':c.running?'Nedtelling pågår':c.remaining!==c.initial?'Pauset':'Klar';$('countBox').classList.toggle('observed',c.finished&&state.options.countVisual);$('countBox').classList.toggle('finished',c.finished&&state.options.countVisual);
+ $('countMinutes').disabled=c.running;$('countSeconds').disabled=c.running;
+ const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);$('stopState').textContent=s.running?'Pågår':elapsed?'Pauset':'Klar';
+ for(const [start,pause,running] of [['metroStart','metroPause',m.running],['countStart','countPause',c.running],['stopStart','stopPause',s.running]]){$(start).disabled=running;$(pause).disabled=!running}
+ $('countBadge').hidden=!(c.running||c.finished);$('countBadge').textContent=c.finished?'FERDIG':fmtCount(remaining());$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
+ let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
+ // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
+ if(b.length>=2&&age>=10000&&b[b.length-1]>b[0]){$('breathRate').textContent=Math.round(60000*(b.length-1)/(b[b.length-1]-b[0]));$('breathStatus').textContent=age>=60000?'60 sekunder passert':'Foreløpig estimat'}else{$('breathRate').textContent='–';$('breathStatus').textContent=b.length?'Avventer 2 pust og 10 sekunder':'Ikke startet'}$('breathBox').classList.toggle('observed',age>=60000);
+ const due=state.pauses.filter(p=>now>=p.time&&now<p.time+p.length*60000);const upcoming=state.pauses.filter(p=>now<p.time).sort((a,b)=>a.time-b.time);const pausetab=document.querySelector('[data-tab="pause"]');pausetab.classList.toggle('pause-due',due.length>0);$('pauseBadge').hidden=!due.length;$('pauseBadge').textContent=due.length?'NÅ':'';$('pauseState').textContent=due.length?`${due.map(p=>p.type).join(' + ')} nå`:upcoming.length?`Neste: ${upcoming[0].type}`:'Ingen kommende pauser';$('pauseDetail').textContent=due.length?`Til ${new Date(Math.min(...due.map(p=>p.time+p.length*60000))).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'})}`:upcoming.length?new Date(upcoming[0].time).toLocaleTimeString('no-NO',{hour:'2-digit',minute:'2-digit'}):state.pauses.length?'Tidspunkt passert':'Angi tidspunkter over';document.querySelector('.pause-display').classList.toggle('due',!!due.length);
+ for(const p of due){const key=`${p.type}:${p.time}`;if(!state.pauseNotified.has(key)){state.pauseNotified.add(key);if(state.options.pauseSound)melody()}}
+ const active=[m.running?'Metronom':'',c.running?'Nedtelling':'',s.running?'Stoppeklokke':''].filter(Boolean);$('activityText').textContent=active.length?`Aktiv: ${active.join(', ')}`:'Ingen aktive klokker';document.querySelector('.live-dot').classList.toggle('on',active.length>0);
+}
+setInterval(()=>{scheduleMetro();render()},60);
+window.addEventListener('beforeunload',e=>{if(state.metro.running||state.count.running||state.stop.running||state.pauses.some(p=>p.time>Date.now())){e.preventDefault();e.returnValue=''}});
+setMode('voksen');render();
 })();
