@@ -2,65 +2,89 @@
 <html lang="no">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
     <link rel="stylesheet" href="klokker.css">
     <script src="klokker.js" defer></script>
 </head>
-<body>
-    <main class="tool" aria-label="OPSIX klokkeverktøy">
+<body data-theme="natt">
+    <main class="tool">
         <header class="top">
             <div class="brand-icon" aria-hidden="true">
                 <svg viewBox="0 0 48 48" fill="none">
                     <path d="M10 38 19 8h10l9 30H10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
                     <path d="M24 13v20" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
-                    <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2" stroke-linejoin="round"/>
                 </svg>
             </div>
             <div class="brand-title">
                 <strong>Støtteverktøy</strong>
                 <span>Klokkeverktøy</span>
             </div>
-            <button id="openWindow" class="icon-button" type="button" title="Åpne i nytt vindu" aria-label="Åpne i nytt vindu">↗</button>
+            <div class="header-actions">
+                <label class="theme-label" for="theme">Visning</label>
+                <select id="theme" aria-label="Velg lysnivå">
+                    <option value="dag">Dag</option>
+                    <option value="dempet">Dempet</option>
+                    <option value="natt" selected>Natt</option>
+                </select>
+                <button id="openWindow" class="icon-button" title="Åpne eget vindu" aria-label="Åpne eget vindu">↗</button>
+            </div>
         </header>
-
-        <nav class="tabs" aria-label="Velg verktøy">
+        <nav class="tabs" aria-label="Klokkeverktøy">
             <button class="tab active" data-tab="metronom" aria-selected="true">
-                <span class="tab-symbol">♩</span>
-                <span>Metronom</span>
+                <span class="tab-symbol brand-small" aria-hidden="true">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <path d="M10 38 19 8h10l9 30H10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                        <path d="M24 13v20" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+                        <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2"/>
+                    </svg>
+                </span>
+                Metronom
             </button>
             <button class="tab" data-tab="nedtelling" aria-selected="false">
                 <span class="tab-symbol">◴</span>
-                <span>Nedtelling</span>
+                Nedtelling
                 <small id="countBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="stoppeklokke" aria-selected="false">
                 <span class="tab-symbol">⏱</span>
-                <span>Stoppeklokke</span>
+                Stoppeklokke
                 <small id="stopBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="pusteteller" aria-selected="false">
                 <span class="tab-symbol">♧</span>
-                <span>Pusteteller</span>
+                Pusteteller
+            </button>
+            <button class="tab" data-tab="pause" aria-selected="false">
+                <span class="tab-symbol">☕</span>
+                Pause
+                <small id="pauseBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="helikopter" aria-selected="false">
+                <span class="tab-symbol">🚁</span>
+                Helikopter
+                <small id="heliBadge" class="tab-status" hidden></small>
             </button>
         </nav>
-
-        <section class="pane active" id="metronom" aria-label="Metronom">
+        <section class="pane" id="metronom">
             <h1>Metronom</h1>
-            <p class="subtitle">Hørbar rytme til bruk ved HLR. Følg lokale prosedyrer.</p>
             <div class="display beat-display" id="beatDisplay">
-                <strong id="bpmLabel">
-                    110 
-                    <span>BPM</span>
-                </strong>
+                <div id="bpmView" class="bpm-view">
+                    <button type="button" id="bpmLabel" class="bpm-number" title="Trykk for å skrive takt" aria-label="Endre takt">
+                        110 
+                        <span>BPM</span>
+                    </button>
+                    <input id="bpmDirect" class="bpm-direct" type="number" min="100" max="120" inputmode="numeric" aria-label="Ny takt" hidden>
+                </div>
                 <div class="pulse-line" aria-hidden="true">
                     <svg viewBox="0 0 240 24" preserveAspectRatio="none">
                         <path d="M0 12 H99 L106 12 L112 5 L118 20 L124 7 L130 12 H240" stroke="currentColor" fill="none" stroke-width="1.8"/>
                     </svg>
                 </div>
             </div>
-            <label class="field-label">Modus</label>
+            <label class="field-label">Pasientkategori</label>
             <div class="choices">
                 <button type="button" class="choice selected" data-mode="voksen">Voksen</button>
                 <button type="button" class="choice" data-mode="barn">Barn</button>
@@ -68,25 +92,23 @@
                 <button type="button" class="choice" data-mode="nyfodt">Nyfødt ved fødsel</button>
             </div>
             <div class="adjuster" id="bpmAdjust">
-                <label for="bpmInput">Kompresjoner/min</label>
+                <label for="bpmInput">Juster takt</label>
                 <div>
-                    <button id="bpmDown" type="button" aria-label="Reduser takt">−</button>
-                    <input id="bpmInput" inputmode="numeric" type="number" min="100" max="120" step="5" value="110">
-                    <button id="bpmUp" type="button" aria-label="Øk takt">+</button>
+                    <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
+                    <input id="bpmInput" type="number" inputmode="numeric" min="100" max="120" step="1" value="110">
+                    <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
                 </div>
             </div>
-            <p id="metronomeHint" class="hint">Voksen: 100–120 kompresjoner per minutt. Standard 110 BPM.</p>
+            <p id="metronomeHint" class="hint compact" hidden></p>
             <div class="actions">
-                <button id="metroStart" class="btn primary" type="button">▶ Start</button>
-                <button id="metroPause" class="btn" type="button">Ⅱ Pause</button>
-                <button id="metroReset" class="btn" type="button">↻ Nullstill</button>
+                <button id="metroStart" class="btn primary">▶ Start</button>
+                <button id="metroPause" class="btn">Ⅱ Pause</button>
+                <button id="metroReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
-
-        <section class="pane" id="nedtelling" aria-label="Nedtelling" hidden>
+        <section class="pane" id="nedtelling" hidden>
             <h1>Nedtelling</h1>
-            <p class="subtitle">Angi tiden, og start nedtellingen.</p>
-            <div class="display time-display">
+            <div class="display time-display" id="countBox">
                 <strong id="countDisplay">03:00</strong>
                 <span id="countState">Klar</span>
             </div>
@@ -100,33 +122,50 @@
                     <input id="countSeconds" type="number" min="0" max="59" value="0" inputmode="numeric">
                 </label>
             </div>
-            <p class="hint">Lydvarsel ved 00:00 når lyd er aktivert i nettleseren.</p>
+            <div class="toggle-list">
+                <div class="toggle-row">
+                    <span>Lydvarsel ved 00:00?</span>
+                    <div class="binary" data-setting="countSound">
+                        <button class="selected" data-value="yes">Ja</button>
+                        <button data-value="no">Nei</button>
+                    </div>
+                </div>
+                <div class="toggle-row">
+                    <span>Visuell varsling ved 00:00?</span>
+                    <div class="binary" data-setting="countVisual">
+                        <button class="selected" data-value="yes">Ja</button>
+                        <button data-value="no">Nei</button>
+                    </div>
+                </div>
+            </div>
             <div class="actions">
-                <button id="countStart" class="btn primary" type="button">▶ Start</button>
-                <button id="countPause" class="btn" type="button">Ⅱ Pause</button>
-                <button id="countReset" class="btn" type="button">↻ Nullstill</button>
+                <button id="countStart" class="btn primary">▶ Start</button>
+                <button id="countPause" class="btn">Ⅱ Pause</button>
+                <button id="countReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
-
-        <section class="pane" id="stoppeklokke" aria-label="Stoppeklokke" hidden>
+        <section class="pane" id="stoppeklokke" hidden>
             <h1>Stoppeklokke</h1>
-            <p class="subtitle">Mål medgått tid med start, pause og nullstilling.</p>
             <div class="display time-display">
                 <strong id="stopDisplay">00:00:00</strong>
                 <span id="stopState">Klar</span>
             </div>
-            <p class="hint">Klokken fortsetter når du åpner en annen fane i dette verktøyet.</p>
             <div class="actions">
-                <button id="stopStart" class="btn primary" type="button">▶ Start</button>
-                <button id="stopPause" class="btn" type="button">Ⅱ Pause</button>
-                <button id="stopReset" class="btn" type="button">↻ Nullstill</button>
+                <button id="stopStart" class="btn primary">▶ Start</button>
+                <button id="stopPause" class="btn">Ⅱ Pause</button>
+                <button id="stopReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
-
-        <section class="pane" id="pusteteller" aria-label="Pusteteller" hidden>
+        <section class="pane" id="pusteteller" hidden>
             <h1>Pusteteller</h1>
-            <p class="subtitle">Trykk én gang for hvert observerte åndedrag.</p>
-            <div class="display breath-display">
+            <p class="subtitle">
+                Trykk én gang for hvert observerte åndedrag.
+                <br>
+                Estimat etter minimum 2 pust og 10 sekunder.
+                <br>
+                Anbefalt observasjonstid er 60 sekunder.
+            </p>
+            <div class="display breath-display" id="breathBox">
                 <strong id="breathCount">0</strong>
                 <span>registrerte pust</span>
                 <div class="breath-result">
@@ -134,19 +173,78 @@
                     <b id="breathRate">–</b>
                     <span>/min</span>
                 </div>
+                <span class="observation" id="breathTime">Observasjon 00:00 / 01:00</span>
+                <span class="observation" id="breathStatus">Ikke startet</span>
             </div>
             <button type="button" class="btn primary big-breath" id="breathTap">+ Registrer pust</button>
-            <p class="hint" id="breathHint">Tell helst i 60 sekunder for å vurdere respirasjonsfrekvens. Observer også pustemønster og pustekvalitet.</p>
             <div class="actions single">
-                <button id="breathReset" class="btn" type="button">↻ Nullstill</button>
+                <button id="breathReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
-
+        <section class="pane" id="pause" hidden>
+            <h1>Pause</h1>
+            <div class="pause-setting">
+                <label for="mealTime">Matpause – angi klokkeslett</label>
+                <input id="mealTime" type="time">
+                <label for="mealLength">Varighet (minutter)</label>
+                <input id="mealLength" type="number" value="30" min="1" max="240">
+            </div>
+            <div class="pause-setting">
+                <label for="screenTime">Skjermpause – angi klokkeslett</label>
+                <input id="screenTime" type="time">
+                <label for="screenLength">Varighet (minutter)</label>
+                <input id="screenLength" type="number" value="5" min="1" max="120">
+            </div>
+            <div class="toggle-row">
+                <span>Lydvarsel når pausen starter?</span>
+                <div class="binary" data-setting="pauseSound">
+                    <button data-value="yes">Ja</button>
+                    <button class="selected" data-value="no">Nei</button>
+                </div>
+            </div>
+            <p class="hint compact">Klokkeslett gjelder i dag. Varsling fungerer når klokkevinduet er åpent og nettleseren tillater lyd.</p>
+            <div class="display pause-display">
+                <strong id="pauseState">Ingen pause satt</strong>
+                <span id="pauseDetail">Angi tidspunkter over</span>
+            </div>
+            <div class="actions two">
+                <button class="btn primary" id="pauseSave">Lagre pauser</button>
+                <button class="btn" id="pauseReset">↻ Nullstill</button>
+            </div>
+        </section>
+        <section class="pane" id="helikopter" hidden>
+            <h1>Helikoptervarsling</h1>
+            <div class="display heli-display">
+                <strong>03:00</strong>
+                <span>Redningshelikopter – 3 min</span>
+            </div>
+            <p class="hint">Denne funksjonen skal kobles til den eksisterende, godkjente varslingen i Luftambulansekoordinator. Ingen separat alarm starter her.</p>
+            <button id="heliOpen" class="btn primary full">Åpne eksisterende varsling ↗</button>
+            <p class="hint compact" id="heliConfigHint"></p>
+        </section>
         <footer class="footer">
             <span class="live-dot"></span>
-            <span id="activityText" role="status" aria-live="polite">Ingen aktive klokker</span>
-            <span class="version">OPSIX</span>
+            <span id="activityText" role="status">Ingen aktive klokker</span>
         </footer>
+        <div class="bottom-links">
+            <button id="versionButton">V1.1.0 · Versjonslogg</button>
+            <button id="feedbackButton">Send tilbakemelding ↗</button>
+        </div>
+        <p class="copyright">© 2026 OPSIX · Utviklet av Gunnar Tande</p>
     </main>
+    <dialog id="versionDialog">
+        <h2>Versjonslogg</h2>
+        <p>
+            <b>V1.1.0 – 09.11.2026</b>
+            <br>
+            Seks faner, pausevarsler, lysnivåer, taktinnstilling, nedtellingsvarsler og oppdatert pusteteller.
+        </p>
+        <p>
+            <b>V1.0.0 – 06.11.2026</b>
+            <br>
+            Første prototype: metronom, nedtelling, stoppeklokke og pusteteller.
+        </p>
+        <button id="closeVersion" class="btn">Lukk</button>
+    </dialog>
 </body>
 </html>
