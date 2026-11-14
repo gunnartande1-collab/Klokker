@@ -427,24 +427,15 @@ function confirmBeforeLeaving(event) {
  event.returnValue = '1';
 }
 
-const standaloneClockPage = window.self === window.top;
-if (standaloneClockPage) {
- window.addEventListener('beforeunload', confirmBeforeLeaving);
-}
+window.addEventListener('beforeunload', confirmBeforeLeaving);
 
-let leaveGuardEnabled = false;
-function updateLeaveGuard(now) {
+function updateActiveClockIndicator(now) {
  const {metro, count, stop, heli, pauses} = state;
  const pausedCountdown = count.paused && count.remaining > 0;
  const hasPendingPause = pauses.some(pause => pause.time > now);
- const shouldProtect = heli.start !== null || metro.running || count.running ||
+ const hasActiveClock = heli.start !== null || metro.running || count.running ||
    pausedCountdown || stop.running || stop.elapsed > 0 || hasPendingPause;
- if (shouldProtect === leaveGuardEnabled) return;
- leaveGuardEnabled = shouldProtect;
- document.documentElement.toggleAttribute('data-opsix-active-clock', shouldProtect);
- if (standaloneClockPage) return;
- if (shouldProtect) window.addEventListener('beforeunload', confirmBeforeLeaving);
- else window.removeEventListener('beforeunload', confirmBeforeLeaving);
+ document.documentElement.toggleAttribute('data-opsix-active-clock', hasActiveClock);
 }
 
 function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
@@ -464,7 +455,7 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
  if(b.length>=2&&age>=10000&&b[b.length-1]>b[0]){$('breathRate').textContent=Math.round(60000*(b.length-1)/(b[b.length-1]-b[0]));$('breathStatus').textContent=age>=60000?'60 sekunder passert':'Foreløpig estimat'}else{$('breathRate').textContent='–';$('breathStatus').textContent=b.length?'Avventer 2 pust og 10 sekunder':'Ikke startet'}$('breathBox').classList.toggle('observed',age>=60000);
  renderPauses(now);
- updateLeaveGuard(now);
+ updateActiveClockIndicator(now);
  const landingTime = renderLanding();
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
    : c.finished && state.options.countVisual ? 'Ferdig | Nedtelling'
