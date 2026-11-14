@@ -23,7 +23,7 @@ function alarm() {
    }
  }
 }
-const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
+const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const modes={voksen:110,nyfodt:120};
 const tabs=[...document.querySelectorAll('[data-tab]')];
 function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==id)}
@@ -222,6 +222,7 @@ $('countStart').addEventListener('click', () => {
  if (state.options.countSound) getAudio();
  countdown.end = Date.now() + countdown.remaining;
  countdown.running = true;
+ countdown.paused = false;
  render();
 });
 function finishCountdown() {
@@ -240,12 +241,15 @@ $('countPause').addEventListener('click', () => {
  if (!countdown.running) return;
  countdown.remaining = remaining();
  if (!countdown.remaining) finishCountdown();
- else countdown.running = false;
+ else {
+   countdown.running = false;
+   countdown.paused = true;
+ }
  render();
 });
 $('countReset').addEventListener('click', () => {
  clearCountAlert();
- Object.assign(state.count, {running:false, remaining:0, initial:0, edited:false});
+ Object.assign(state.count, {running:false, remaining:0, initial:0, edited:false, paused:false});
  $('countError').hidden = true;
  render();
 });
@@ -418,6 +422,24 @@ function renderLanding() {
 }
 $('feedbackButton').addEventListener('click',()=>{window.open(CONFIG.feedbackUrl,'_blank','noopener')});
 $('versionButton').addEventListener('click',()=>$('versionDialog').showModal());$('closeVersion').addEventListener('click',()=>$('versionDialog').close());
+function confirmBeforeLeaving(event) {
+ event.preventDefault();
+ event.returnValue = true;
+}
+
+let leaveGuardEnabled = false;
+function updateLeaveGuard(now) {
+ const {metro, count, stop, heli, pauses} = state;
+ const pausedCountdown = count.paused && count.remaining > 0;
+ const hasPendingPause = pauses.some(pause => pause.time > now);
+ const shouldProtect = heli.start !== null || metro.running || count.running ||
+   pausedCountdown || stop.running || stop.elapsed > 0 || hasPendingPause;
+ if (shouldProtect === leaveGuardEnabled) return;
+ leaveGuardEnabled = shouldProtect;
+ if (shouldProtect) window.addEventListener('beforeunload', confirmBeforeLeaving);
+ else window.removeEventListener('beforeunload', confirmBeforeLeaving);
+}
+
 function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if (c.running && remaining() <= 0) finishCountdown();
  const displayedTime = formatCountdown(remaining());
@@ -435,6 +457,7 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
  if(b.length>=2&&age>=10000&&b[b.length-1]>b[0]){$('breathRate').textContent=Math.round(60000*(b.length-1)/(b[b.length-1]-b[0]));$('breathStatus').textContent=age>=60000?'60 sekunder passert':'Foreløpig estimat'}else{$('breathRate').textContent='–';$('breathStatus').textContent=b.length?'Avventer 2 pust og 10 sekunder':'Ikke startet'}$('breathBox').classList.toggle('observed',age>=60000);
  renderPauses(now);
+ updateLeaveGuard(now);
  const landingTime = renderLanding();
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
    : c.finished && state.options.countVisual ? 'Ferdig | Nedtelling'
@@ -445,7 +468,7 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
 setInterval(()=>{scheduleMetro();render()},60);
 document.addEventListener('visibilitychange', render);
 window.addEventListener('focus', render);
-window.addEventListener('beforeunload',e=>{if(state.metro.running||state.count.running||state.stop.running||state.heli.start!==null||state.pauses.some(p=>p.time>Date.now())){e.preventDefault();e.returnValue=''}});
+
 setMode('voksen');render();
 requestAnimationFrame(drawBeatCursor);
 })();
