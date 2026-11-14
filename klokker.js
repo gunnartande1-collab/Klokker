@@ -424,7 +424,7 @@ $('feedbackButton').addEventListener('click',()=>{window.open(CONFIG.feedbackUrl
 $('versionButton').addEventListener('click',()=>$('versionDialog').showModal());$('closeVersion').addEventListener('click',()=>$('versionDialog').close());
 function confirmBeforeLeaving(event) {
  event.preventDefault();
- event.returnValue = true;
+ event.returnValue = '1';
 }
 
 let leaveGuardEnabled = false;
@@ -436,6 +436,7 @@ function updateLeaveGuard(now) {
    pausedCountdown || stop.running || stop.elapsed > 0 || hasPendingPause;
  if (shouldProtect === leaveGuardEnabled) return;
  leaveGuardEnabled = shouldProtect;
+ document.documentElement.toggleAttribute('data-opsix-active-clock', shouldProtect);
  if (shouldProtect) window.addEventListener('beforeunload', confirmBeforeLeaving);
  else window.removeEventListener('beforeunload', confirmBeforeLeaving);
 }
