@@ -12,10 +12,19 @@ function getAudio(){try{audio ||= new (window.AudioContext||window.webkitAudioCo
 function tone(time,frequency=800,duration=.08,volume=.12,type='sine'){
  const a=getAudio();if(!a)return;try{const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=frequency;g.gain.setValueAtTime(.0001,time);g.gain.exponentialRampToValueAtTime(volume,time+.009);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g).connect(a.destination);o.start(time);o.stop(time+duration+.02);return o}catch{}
 }
-function melody(){const a=getAudio();if(a&&a.state==='running')[[0,523],[.20,659],[.40,784]].forEach(([d,f])=>tone(a.currentTime+.02+d,f,.23,.1,'sine'))}
-function alarm(){const a=getAudio();if(a&&a.state==='running')[[0,840],[.26,840],[.52,840]].forEach(([d,f])=>tone(a.currentTime+.02+d,f,.15,.18,'triangle'))}
+const pauseNotes = [[0,523],[.20,659],[.40,784]];
+const countTones = new Set();
+function alarm() {
+ const context = getAudio();
+ if (!context || context.state !== 'running') return;
+ for (const repeat of [0, 1.25]) {
+   for (const delay of [0, .26, .52]) {
+     trackTone(countTones, tone(context.currentTime + .02 + repeat + delay, 840, .15, .18, 'triangle'));
+   }
+ }
+}
 const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
-const modes={voksen:110,barn:110,spedbarn:110,nyfodt:120};
+const modes={voksen:110,nyfodt:120};
 const tabs=[...document.querySelectorAll('[data-tab]')];
 function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==id)}
 tabs.forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
@@ -24,7 +33,17 @@ $('openWindow').addEventListener('click',()=>window.open(location.href,'_blank',
 let saved='natt';try{saved=localStorage.getItem('opsix-clocks-theme')||'natt'}catch{}
 if(!['dag','dempet','natt'].includes(saved))saved='natt';$('theme').value=saved;document.body.dataset.theme=saved;
 $('theme').addEventListener('change',e=>{const v=e.target.value;document.body.dataset.theme=v;try{localStorage.setItem('opsix-clocks-theme',v)}catch{}});
-function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();restartMetroCycle();$('ecgFourth').toggleAttribute('hidden',mode==='nyfodt');$('ecgVent').toggleAttribute('hidden',mode!=='nyfodt')}
+const textSize = $('textSize');
+try {
+ const preference = localStorage.getItem('opsix-clocks-text');
+ if (['normal','large','extra'].includes(preference)) textSize.value = preference;
+} catch {}
+document.body.dataset.textSize = textSize.value;
+textSize.addEventListener('change', () => {
+ document.body.dataset.textSize = textSize.value;
+ try { localStorage.setItem('opsix-clocks-text', textSize.value); } catch {}
+});
+function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];$('metronomeHint').hidden=mode!=='nyfodt';document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();restartMetroCycle();$('ecgFourth').toggleAttribute('hidden',mode==='nyfodt');$('ecgVent').toggleAttribute('hidden',mode!=='nyfodt')}
 function updateBpmView(){const m=state.metro;$('bpmLabel').innerHTML=m.mode==='nyfodt'?'3:1 <span>HLR</span>':`${m.bpm} <span>BPM</span>`;$('bpmInput').value=m.bpm;$('bpmDirect').value=m.bpm}
 function setBpm(value) {
  const metro = state.metro;
@@ -107,9 +126,61 @@ function drawBeatCursor() {
  requestAnimationFrame(drawBeatCursor);
 }
 
-const countInput = $('countDisplay');
+function timeParts(id) {
+ const group = $(id);
+ const inputs = [...group.querySelectorAll('input')];
+ const clearError = () => inputs.forEach(input => input.removeAttribute('aria-invalid'));
+ inputs.forEach((input, index) => {
+   input.addEventListener('focus', () => input.select());
+   input.addEventListener('click', () => input.select());
+   input.addEventListener('input', () => {
+     input.value = input.value.replace(/\D/g, '').slice(0, 2);
+     clearError();
+     if (input.value.length === 2 && Number(input.value) <= Number(input.dataset.max)) {
+       inputs[index + 1]?.focus();
+     }
+   });
+   input.addEventListener('blur', () => {
+     if (input.value) input.value = input.value.padStart(2, '0');
+   });
+   input.addEventListener('paste', event => {
+     const value = event.clipboardData?.getData('text').trim();
+     if (!value || !new RegExp('^\\d{2}(?::?\\d{2}){' + (inputs.length - 1) + '}$').test(value)) return;
+     event.preventDefault();
+     write(value.replace(/:/g, '').match(/\d{2}/g).join(':'));
+     group.dispatchEvent(new Event('input', {bubbles:true}));
+   });
+ });
+ function write(value) {
+   const parts = value.split(':');
+   inputs.forEach((input, index) => {
+     if (input.value !== (parts[index] || '')) input.value = parts[index] || '';
+   });
+   clearError();
+ }
+ return {
+   group,
+   write,
+   value: () => inputs.map(input => input.value).join(':'),
+   read({requireAll = false} = {}) {
+     const invalid = inputs.find(input =>
+       (requireAll && !input.value) || (input.value && (!/^\d{1,2}$/.test(input.value) || Number(input.value) > Number(input.dataset.max)))
+     );
+     if (invalid) {
+       invalid.setAttribute('aria-invalid','true');
+       invalid.focus();
+       return null;
+     }
+     return inputs.map(input => Number(input.value));
+   },
+   readOnly: value => inputs.forEach(input => { input.readOnly = value; })
+ };
+}
+const durationMs = ([hours, minutes, seconds]) => (hours * 3600 + minutes * 60 + seconds) * 1000;
+const countInput = timeParts('countDisplay');
 const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
+const countBox = $('countBox');
 function remaining() {
  const countdown = state.count;
  return countdown.running ? Math.max(0, countdown.end - Date.now()) : countdown.remaining;
@@ -118,48 +189,39 @@ function formatCountdown(ms) {
  const seconds = Math.ceil(ms / 1000);
  return [fmt2(seconds / 3600), fmt2(seconds / 60 % 60), fmt2(seconds % 60)].join(':');
 }
-function parseCountdown(value) {
- const text = value.trim();
- if (!text) return 0;
- const match = /^(\d{1,2}):(\d{1,2}):(\d{1,2})$/.exec(text)
-   || /^(\d{2})(\d{2})(\d{2})$/.exec(text);
- if (!match) return null;
- const [hours, minutes, seconds] = match.slice(1).map(Number);
- if (minutes > 59 || seconds > 59) return null;
- return (hours * 3600 + minutes * 60 + seconds) * 1000;
+function clearCountAlert() {
+ state.count.finished = false;
+ countBox.classList.remove('count-flash');
+ countTab.classList.remove('count-flash');
+ stopTones(countTones);
 }
-function readCountdown() {
- const duration = parseCountdown(countInput.value);
- $('countError').hidden = duration !== null;
- countInput.setAttribute('aria-invalid', String(duration === null));
- if (duration === null) return false;
- const countdown = state.count;
- countdown.initial = countdown.remaining = duration;
- countdown.finished = false;
- countInput.value = formatCountdown(duration);
- return true;
-}
-countInput.addEventListener('focus', () => {
- if (!countInput.readOnly) countInput.select();
-});
-countInput.addEventListener('change', () => {
- if (!countInput.readOnly) readCountdown();
+countInput.group.addEventListener('input', () => {
+ if (state.count.running) return;
+ clearCountAlert();
+ state.count.edited = true;
+ $('countError').hidden = true;
  render();
 });
-countInput.addEventListener('keydown', event => {
- if (event.key === 'Enter' && !countInput.readOnly) $('countStart').click();
+countInput.group.addEventListener('keydown', event => {
+ if (event.key === 'Enter') $('countStart').click();
 });
 $('countStart').addEventListener('click', () => {
  const countdown = state.count;
  if (countdown.running) return;
- if (parseCountdown(countInput.value) === null) { readCountdown(); return; }
- if ((countInput.value !== formatCountdown(countdown.remaining) || countInput.getAttribute('aria-invalid') === 'true') && !readCountdown()) return;
- if (countdown.finished) countdown.remaining = countdown.initial;
+ if (countdown.edited) {
+   const parts = countInput.read();
+   $('countError').hidden = !!parts;
+   if (!parts) return;
+   countdown.initial = countdown.remaining = durationMs(parts);
+   countdown.edited = false;
+ } else if (countdown.finished) {
+   countdown.remaining = countdown.initial;
+ }
  if (!countdown.remaining) return;
- getAudio();
+ clearCountAlert();
+ if (state.options.countSound) getAudio();
  countdown.end = Date.now() + countdown.remaining;
  countdown.running = true;
- countdown.finished = false;
  render();
 });
 function finishCountdown() {
@@ -168,6 +230,10 @@ function finishCountdown() {
  countdown.remaining = 0;
  countdown.finished = true;
  if (state.options.countSound) alarm();
+ if (state.options.countVisual) {
+   const target = $('nedtelling').hidden ? countTab : countBox;
+   target.classList.add('count-flash');
+ }
 }
 $('countPause').addEventListener('click', () => {
  const countdown = state.count;
@@ -178,62 +244,67 @@ $('countPause').addEventListener('click', () => {
  render();
 });
 $('countReset').addEventListener('click', () => {
- Object.assign(state.count, {running:false, remaining:0, initial:0, finished:false});
- countInput.value = '00:00:00';
- readCountdown();
+ clearCountAlert();
+ Object.assign(state.count, {running:false, remaining:0, initial:0, edited:false});
+ $('countError').hidden = true;
  render();
 });
-for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
+for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){if(state.options.pauseSound)getAudio();schedulePauseAudio()}if(opt==='countVisual'&&!state.options.countVisual){countBox.classList.remove('count-flash');countTab.classList.remove('count-flash')}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
 $('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
-const pauseFields = [['Matpause', $('mealTime')], ['Skjermpause', $('screenTime')]];
-function parsePauseTime(value) {
- const match = /^(\d{1,2}):?(\d{2})$/.exec(value.trim());
- if (!match) return null;
- const hours = Number(match[1]);
- const minutes = Number(match[2]);
- return hours < 24 && minutes < 60 ? [hours, minutes] : null;
+const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
+for (const [, field] of pauseFields) field.group.addEventListener('input', () => { $('pauseError').hidden = true; });
+const pauseTones = new Set();
+function schedulePauseAudio() {
+ stopTones(pauseTones);
+ if (!state.options.pauseSound || !audio) return;
+ const now = Date.now();
+ for (const pause of state.pauses) {
+   if (pause.notified) continue;
+   const start = audio.currentTime + Math.max(.03, (pause.time - now) / 1000);
+   for (const [delay, frequency] of pauseNotes) {
+     trackTone(pauseTones, tone(start + delay, frequency, .23, .18));
+   }
+ }
 }
 $('pauseSave').addEventListener('click', () => {
  const now = Date.now();
  const pauses = [];
  for (const [type, field] of pauseFields) {
-   if (!field.value.trim()) continue;
-   const time = parsePauseTime(field.value);
+   if (field.value() === ':') continue;
+   const time = field.read({requireAll:true});
    if (!time) {
-     field.setCustomValidity('Skriv et klokkeslett mellom 00:00 og 23:59.');
-     field.reportValidity();
+     $('pauseError').hidden = false;
      return;
    }
    const [hours, minutes] = time;
-   field.value = fmt2(hours) + ':' + fmt2(minutes);
+   const label = fmt2(hours) + ':' + fmt2(minutes);
+   field.write(label);
    const date = new Date(now);
    date.setHours(hours, minutes, 0, 0);
    if (date.getTime() + 60000 <= now) date.setDate(date.getDate() + 1);
    const timeMs = date.getTime();
    const existing = state.pauses.find(pause => pause.field === field && pause.time === timeMs);
-   pauses.push({type, field, time:timeMs, label:field.value, notified:existing?.notified ?? false});
+   pauses.push({type, field, time:timeMs, label, notified:existing?.notified ?? false});
  }
+ $('pauseError').hidden = true;
  state.pauses = pauses;
  if (state.options.pauseSound) getAudio();
+ schedulePauseAudio();
  render();
 });
-for (const [, field] of pauseFields) field.addEventListener('input', () => field.setCustomValidity(''));
 $('pauseReset').addEventListener('click', () => {
+ $('pauseError').hidden = true;
  state.pauses = [];
- for (const [, field] of pauseFields) {
-   field.value = '';
-   field.setCustomValidity('');
- }
+ stopTones(pauseTones);
+ for (const [, field] of pauseFields) field.write('');
  render();
 });
 function renderPauses(now) {
  const due = state.pauses.filter(pause => now >= pause.time);
- const fresh = due.filter(pause => !pause.notified);
- for (const pause of fresh) pause.notified = true;
- if (fresh.length && state.options.pauseSound) melody();
+ for (const pause of due) pause.notified = true;
  for (const [, field] of pauseFields) {
-   field.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
+   field.group.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
  }
  document.querySelector('[data-tab="pause"]').classList.toggle('pause-due', !!due.length);
  $('pauseBadge').hidden = !due.length;
@@ -244,8 +315,14 @@ function renderPauses(now) {
  if ($('pauseState').textContent !== message) $('pauseState').textContent = message;
 }
 
-const landingDuration = 180000;
-const landingWarning = 90000;
+const defaultLandingDuration = 180000;
+const defaultLandingWarning = 90000;
+const landingDuration = timeParts('heliDuration');
+const landingWarning = timeParts('heliWarning');
+for (const entry of [landingDuration, landingWarning]) {
+ entry.group.addEventListener('input', () => { $('heliError').hidden = true; });
+ entry.group.addEventListener('keydown', event => { if (event.key === 'Enter') $('heliStart').click(); });
+}
 const landingRepeat = 8000;
 const landingTones = new Set();
 const heliTab = document.querySelector('[data-tab="helikopter"]');
@@ -273,15 +350,36 @@ function stopLandingSound() {
  landingPlayback = null;
  stopTones(landingTones);
 }
+function setLandingError(message) {
+ $('heliError').textContent = message;
+ $('heliError').hidden = !message;
+}
 $('heliStart').addEventListener('click', () => {
  if (state.heli.start !== null) return;
+ const durationParts = landingDuration.read();
+ const warningParts = durationParts && landingWarning.read();
+ if (!durationParts || !warningParts) {
+   setLandingError('Minutter og sekunder må være mellom 00 og 59.');
+   return;
+ }
+ const duration = durationMs(durationParts);
+ const warning = durationMs(warningParts);
+ if (!duration || warning >= duration) {
+   setLandingError('Varsling må komme før landing. Angi tid fra start i begge feltene.');
+   return;
+ }
  getAudio();
- state.heli.start = performance.now();
+ setLandingError('');
+ Object.assign(state.heli, {start:performance.now(), duration, warning});
+ landingWarning.write(formatCountdown(warning));
  render();
 });
 $('heliReset').addEventListener('click', () => {
  stopLandingSound();
  Object.assign(state.heli, {start:null, lastAlarm:null, acknowledged:false});
+ landingDuration.write(formatCountdown(defaultLandingDuration));
+ landingWarning.write(formatCountdown(defaultLandingWarning));
+ setLandingError('');
  render();
 });
 $('heliAck').addEventListener('click', () => {
@@ -289,21 +387,26 @@ $('heliAck').addEventListener('click', () => {
  stopLandingSound();
  render();
 });
-$('heliTest').addEventListener('click', playLandingSound);
 function renderLanding() {
  const heli = state.heli;
  const active = heli.start !== null;
  const now = performance.now();
  const elapsed = active ? now - heli.start : 0;
- const ms = landingDuration - elapsed;
- const alert = active && ms <= landingWarning && !heli.acknowledged;
+ const ms = (active ? heli.duration : defaultLandingDuration) - elapsed;
+ const alert = active && elapsed >= heli.warning && !heli.acknowledged;
  if (alert && (heli.lastAlarm === null || now - heli.lastAlarm >= landingRepeat)) {
    heli.lastAlarm = now;
    playLandingSound();
  }
- const time = ms <= -1000 ? '−' + fmtCount(Math.floor(-ms / 1000) * 1000) : fmtCount(ms);
+ const time = ms <= -1000 ? '−' + formatCountdown(Math.floor(-ms / 1000) * 1000) : formatCountdown(Math.max(0, ms));
  $('heliTime').textContent = time;
- $('heliProgress').value = Math.min(180, elapsed / 1000);
+ $('heliTime').hidden = !active;
+ landingDuration.group.hidden = active;
+ landingWarning.readOnly(active);
+ $('heliProgress').max = (active ? heli.duration : defaultLandingDuration) / 1000;
+ $('heliProgress').value = Math.min($('heliProgress').max, elapsed / 1000);
+ $('heliStartMark').textContent = active ? formatCountdown(heli.duration) + ' Start' : 'Start';
+ $('heliWarningMark').textContent = active ? formatCountdown(heli.duration - heli.warning) + ' igjen ved varsel' : 'Varsling';
  $('heliBox').classList.toggle('heli-alert', alert);
  $('heliBox').classList.toggle('heli-overtime', ms <= -1000 && !alert);
  $('heliAlarm').hidden = $('heliAck').hidden = !alert;
@@ -318,17 +421,15 @@ $('versionButton').addEventListener('click',()=>$('versionDialog').showModal());
 function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if (c.running && remaining() <= 0) finishCountdown();
  const displayedTime = formatCountdown(remaining());
- if (countInput.value !== displayedTime && (c.running || (document.activeElement !== countInput && countInput.getAttribute('aria-invalid') !== 'true'))) {
-   countInput.value = displayedTime;
- }
- countInput.readOnly = c.running;
+ if (!c.edited && countInput.value() !== displayedTime) countInput.write(displayedTime);
+ countInput.readOnly(c.running);
  $('countState').textContent = c.finished ? 'FERDIG' : c.running ? 'Nedtelling pågår' : c.remaining !== c.initial ? 'Pauset' : 'Klar';
  const countAlert = c.finished && state.options.countVisual;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
- const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);$('stopState').textContent=s.running?'Pågår':elapsed?'Pauset':'Klar';
+ const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);
  for(const [start,pause,running] of [['metroStart','metroPause',m.running],['countStart','countPause',c.running],['stopStart','stopPause',s.running]]){$(start).disabled=running;$(pause).disabled=!running}
- $('countBadge').hidden=!(c.running||c.finished);$('countBadge').textContent=c.finished?'FERDIG':formatCountdown(remaining());$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
+ $('countBadge').hidden=!c.running;$('countBadge').textContent=c.running?displayedTime:'';$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
  $('breathUndo').disabled = !state.breaths.length;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
@@ -342,6 +443,8 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  const active=[m.running?'Metronom':'',c.running?'Nedtelling':'',s.running?'Stoppeklokke':'',landingTime?'Helikoptervarsling':''].filter(Boolean);$('activityText').textContent=active.length?`Aktiv: ${active.join(', ')}`:'Ingen aktive klokker';document.querySelector('.live-dot').classList.toggle('on',active.length>0);
 }
 setInterval(()=>{scheduleMetro();render()},60);
+document.addEventListener('visibilitychange', render);
+window.addEventListener('focus', render);
 window.addEventListener('beforeunload',e=>{if(state.metro.running||state.count.running||state.stop.running||state.heli.start!==null||state.pauses.some(p=>p.time>Date.now())){e.preventDefault();e.returnValue=''}});
 setMode('voksen');render();
 requestAnimationFrame(drawBeatCursor);
