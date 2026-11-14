@@ -351,7 +351,7 @@ const landingDuration = timeParts('heliDuration');
 const landingEta = timeParts('heliEta');
 const landingWarning = timeParts('heliWarning');
 let etaIsSource = false;
-let enteredEta = null;
+let previewEta = null;
 
 function formatClockTime(ms) {
  const date = new Date(ms);
@@ -368,11 +368,16 @@ function nextEta(parts, now) {
 for (const entry of [landingDuration, landingEta, landingWarning]) {
  entry.group.addEventListener('input', () => {
    setLandingError('');
-   if (entry === landingDuration) etaIsSource = false;
-   if (entry === landingEta) {
-     etaIsSource = true;
-     const parts = landingEta.read({requireAll:true, silent:true});
-     enteredEta = parts ? nextEta(parts, Date.now()) : null;
+   if (entry === landingDuration || entry === landingEta) {
+     etaIsSource = entry === landingEta;
+     const now = Date.now();
+     const parts = entry.read({requireAll:etaIsSource, silent:true});
+     if (!parts) previewEta = null;
+     else if (etaIsSource) previewEta = nextEta(parts, now);
+     else {
+       const duration = durationMs(parts);
+       previewEta = duration > 0 ? now + duration : null;
+     }
    }
    render();
  });
@@ -418,7 +423,7 @@ $('heliStart').addEventListener('click', () => {
    setLandingError('Kontroller timer, minutter og sekunder.');
    return;
  }
- const eta = etaIsSource ? enteredEta ?? nextEta(sourceParts, now) : now + durationMs(sourceParts);
+ const eta = previewEta ?? (etaIsSource ? nextEta(sourceParts, now) : now + durationMs(sourceParts));
  const duration = eta - now;
  if (duration <= 0) {
    setLandingError('Angi en forventet landing fram i tid.');
@@ -435,7 +440,7 @@ $('heliReset').addEventListener('click', () => {
  stopLandingSound();
  Object.assign(state.heli, {start:null, lastAlarm:null, acknowledged:false});
  etaIsSource = false;
- enteredEta = null;
+ previewEta = null;
  landingDuration.write(formatCountdown(defaultLandingDuration));
  landingWarning.write(formatCountdown(defaultLandingWarning));
  setLandingError('');
@@ -464,13 +469,15 @@ function renderLanding(wallTime) {
  landingEta.readOnly(active);
  landingWarning.readOnly(active);
  const durationParts = landingDuration.read({silent:true});
- const eta = active ? heli.eta : etaIsSource ? enteredEta
-   : durationParts ? wallTime + durationMs(durationParts) : null;
- if (!etaIsSource || active) landingEta.write(eta === null ? '' : formatClockTime(eta));
- if (!active && etaIsSource) landingDuration.write(eta === null ? '' : formatCountdown(Math.max(0, eta - wallTime)));
+ const eta = active ? heli.eta : previewEta;
+ if (!etaIsSource || active) landingEta.write(eta === null ? '00:00:00' : formatClockTime(eta));
+ if (!active && !landingDuration.group.contains(document.activeElement)) {
+   if (eta !== null) landingDuration.write(formatCountdown(Math.max(0, eta - wallTime)));
+   else if (etaIsSource) landingDuration.write('00:00:00');
+ }
  $('heliEtaDay').hidden = eta === null || new Date(eta).toDateString() === new Date(wallTime).toDateString();
- const previewDuration = etaIsSource ? Math.max(0, (enteredEta ?? wallTime) - wallTime)
-   : durationParts ? durationMs(durationParts) : defaultLandingDuration;
+ const previewDuration = eta === null ? (durationParts ? durationMs(durationParts) : defaultLandingDuration)
+   : Math.max(0, eta - wallTime);
  const timelineDuration = active ? heli.duration : previewDuration;
  const warningParts = landingWarning.read({silent:true});
  const warningLead = active ? heli.warning : warningParts ? durationMs(warningParts) : defaultLandingWarning;

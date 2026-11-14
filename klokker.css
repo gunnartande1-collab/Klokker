@@ -177,7 +177,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 .time-parts[hidden] { display: none; }
 
-/* Felles hÃƒÂ¸yde fÃƒÂ¸lger det hÃƒÂ¸yeste verktÃƒÂ¸yet, ogsÃƒÂ¥ ved stÃƒÂ¸rre tekst. */
+/* Felles hÃƒÆ’Ã‚Â¸yde fÃƒÆ’Ã‚Â¸lger det hÃƒÆ’Ã‚Â¸yeste verktÃƒÆ’Ã‚Â¸yet, ogsÃƒÆ’Ã‚Â¥ ved stÃƒÆ’Ã‚Â¸rre tekst. */
 .tool-panes { display: grid; }
 .tool-panes > .pane { grid-area: 1 / 1; min-width: 0; }
 .tool-panes > .pane[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
