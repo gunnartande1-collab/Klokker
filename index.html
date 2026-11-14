@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261114-8">
-    <script src="klokker.js?v=20261114-8" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261114-9">
+    <script src="klokker.js?v=20261114-9" defer></script>
 </head>
 <body data-theme="natt">
     <main class="tool">
@@ -225,8 +225,17 @@
                         <div id="heliWarning" class="time-parts" role="group" aria-label="Tid fra varsling til forventet landing" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – timer" data-max="99" value="00"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – minutter" data-max="59" value="01"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – sekunder" data-max="59" value="30"></div>
                     </div>
                     <p id="heliError" role="alert" hidden></p>
-                    <progress id="heliProgress" max="180" value="0" aria-label="Nedtellingens fremdrift"></progress>
-                    <div class="heli-markers"><span id="heliStartMark">00:03:00 Start</span><span id="heliWarningMark">00:01:30 Varsling</span><span>00:00:00 Landing</span></div>
+                    <div class="heli-timeline" id="heliTimeline" aria-label="Tidslinje for landing">
+                        <span class="heli-timeline-start">Start</span>
+                        <span class="heli-timeline-end">Landing</span>
+                        <div class="heli-timeline-track">
+                            <progress id="heliProgress" max="180" value="0" aria-label="Nedtellingens fremdrift"></progress>
+                            <span class="heli-tick heli-tick-start" aria-hidden="true"></span>
+                            <span class="heli-tick heli-tick-warning" id="heliWarningTick" aria-hidden="true"></span>
+                            <span class="heli-tick heli-tick-end" aria-hidden="true"></span>
+                        </div>
+                        <span class="heli-timeline-warning" id="heliWarningMark">Varsling</span>
+                    </div>
                     <p id="heliAlarm" role="alert" hidden>🔔 Aktiver landingsvarsel!</p>
                     <button id="heliAck" class="btn full" type="button" hidden>✓ Varsling aktivert</button>
                 </div>

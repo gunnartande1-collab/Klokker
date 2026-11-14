@@ -177,7 +177,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 .time-parts[hidden] { display: none; }
 
-/* Felles hÃ¸yde fÃ¸lger det hÃ¸yeste verktÃ¸yet, ogsÃ¥ ved stÃ¸rre tekst. */
+/* Felles hÃƒÂ¸yde fÃƒÂ¸lger det hÃƒÂ¸yeste verktÃƒÂ¸yet, ogsÃƒÂ¥ ved stÃƒÂ¸rre tekst. */
 .tool-panes { display: grid; }
 .tool-panes > .pane { grid-area: 1 / 1; min-width: 0; }
 .tool-panes > .pane[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
@@ -230,3 +230,60 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 #heliEtaDay { align-self: flex-end; margin: 0; font-size: .75em; }
 .heli-entry-row.heli-warning-setting { border-top: 1px solid var(--border); padding-top: 8px; }
+
+[data-tab="stoppeklokke"] .tool-symbol svg {
+  width: 35px;
+  height: 35px;
+}
+#nedtelling .toggle-list { margin-top: 24px; }
+#nedtelling > .actions { margin-top: 30px; }
+
+#heliBox { padding: 20px 15px 18px; }
+#heliBox .heli-entry-row { margin-block: 9px; }
+#heliBox .heli-entry-row > span { font-size: calc(15px * var(--text-scale, 1)); }
+#heliBox :is(.heli-entry-row .time-parts, #heliTime) {
+  flex-shrink: 0;
+  font-size: clamp(22px, calc(7.5vw * var(--text-scale, 1)), calc(31px * var(--text-scale, 1)));
+  font-weight: 800;
+  line-height: 1.15;
+}
+#heliBox .heli-warning-setting { padding-top: 14px; }
+#helikopter > .actions { margin-top: 24px; }
+
+.heli-timeline {
+  --warning-position: 50%;
+  position: relative;
+  align-self: stretch;
+  margin: 13px 7px 0;
+  padding-bottom: 26px;
+  font-size: calc(12px * var(--text-scale, 1));
+  font-weight: 700;
+}
+.heli-timeline-start { display: inline-block; }
+.heli-timeline-end { position: absolute; right: 0; top: 0; }
+.heli-timeline-track { position: relative; margin-top: 8px; }
+.heli-timeline #heliProgress { display: block; margin: 0; height: 10px; }
+.heli-tick {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 16px;
+  background: currentColor;
+}
+.heli-tick-start { left: 0; }
+.heli-tick-end { right: 0; }
+.heli-tick-warning {
+  left: var(--warning-position);
+  transform: translateX(-50%);
+  height: 23px;
+}
+.heli-timeline-warning {
+  position: absolute;
+  bottom: 0;
+  left: clamp(3em, var(--warning-position), calc(100% - 3em));
+  transform: translateX(-50%);
+}
+@media (max-width: 360px) {
+  #heliBox { padding-inline: 9px; }
+  #heliBox .heli-entry-row { flex-wrap: wrap; }
+}

@@ -129,7 +129,7 @@ function scheduleMetro() {
    if (when >= now + .12) break;
    const ventilation = metro.mode === 'nyfodt' && metro.step % 4 === 3;
    const duration = Math.min(ventilation ? .16 : .065, Math.max(.012, interval * .7));
-   trackTone(metroTones, tone(when, ventilation ? 500 : 880, duration, ventilation ? .18 : .14));
+   trackTone(metroTones, tone(when, ventilation ? 500 : 880, duration, ventilation ? .36 : .34));
    metro.step++;
  }
 }
@@ -281,13 +281,14 @@ $('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)retur
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
 for (const [, field] of pauseFields) field.group.addEventListener('input', () => { $('pauseError').hidden = true; });
+const pauseAlertDuration = 5 * 60 * 1000;
 const pauseTones = new Set();
 function schedulePauseAudio() {
  stopTones(pauseTones);
  if (!state.options.pauseSound || !audio) return;
  const now = Date.now();
  for (const pause of state.pauses) {
-   if (pause.notified) continue;
+   if (pause.notified || now >= pause.time + pauseAlertDuration) continue;
    const start = audio.currentTime + Math.max(.03, (pause.time - now) / 1000);
    for (const [delay, frequency] of pauseNotes) {
      trackTone(pauseTones, tone(start + delay, frequency, .23, .18));
@@ -328,8 +329,10 @@ $('pauseReset').addEventListener('click', () => {
  render();
 });
 function renderPauses(now) {
- const due = state.pauses.filter(pause => now >= pause.time);
- for (const pause of due) pause.notified = true;
+ const due = state.pauses.filter(pause => now >= pause.time && now < pause.time + pauseAlertDuration);
+ for (const pause of state.pauses) {
+   if (now >= pause.time) pause.notified = true;
+ }
  for (const [, field] of pauseFields) {
    field.group.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
  }
@@ -466,10 +469,20 @@ function renderLanding(wallTime) {
  if (!etaIsSource || active) landingEta.write(eta === null ? '' : formatClockTime(eta));
  if (!active && etaIsSource) landingDuration.write(eta === null ? '' : formatCountdown(Math.max(0, eta - wallTime)));
  $('heliEtaDay').hidden = eta === null || new Date(eta).toDateString() === new Date(wallTime).toDateString();
- $('heliProgress').max = (active ? heli.duration : defaultLandingDuration) / 1000;
+ const previewDuration = etaIsSource ? Math.max(0, (enteredEta ?? wallTime) - wallTime)
+   : durationParts ? durationMs(durationParts) : defaultLandingDuration;
+ const timelineDuration = active ? heli.duration : previewDuration;
+ const warningParts = landingWarning.read({silent:true});
+ const warningLead = active ? heli.warning : warningParts ? durationMs(warningParts) : defaultLandingWarning;
+ const warningPosition = timelineDuration > 0
+   ? 100 * Math.max(0, timelineDuration - warningLead) / timelineDuration : 0;
+ const markerPosition = warningPosition + '%';
+ const timeline = $('heliTimeline');
+ if (timeline.style.getPropertyValue('--warning-position') !== markerPosition) {
+   timeline.style.setProperty('--warning-position', markerPosition);
+ }
+ $('heliProgress').max = Math.max(1, timelineDuration / 1000);
  $('heliProgress').value = Math.min($('heliProgress').max, elapsed / 1000);
- $('heliStartMark').textContent = active ? formatCountdown(heli.duration) + ' Start' : 'Start';
- $('heliWarningMark').textContent = active ? formatCountdown(Math.min(heli.duration, heli.warning)) + ' igjen ved varsel' : 'Varsling';
  $('heliBox').classList.toggle('heli-alert', alert);
  $('heliBox').classList.toggle('heli-overtime', ms <= -1000 && !alert);
  $('heliAlarm').hidden = $('heliAck').hidden = !alert;
