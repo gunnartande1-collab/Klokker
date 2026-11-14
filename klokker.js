@@ -30,14 +30,17 @@ function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.tog
 tabs.forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 $('openWindow').addEventListener('click',()=>window.open(location.href,'_blank','width=460,height=820,resizable=yes,scrollbars=yes'));
 const settings = $('clockSettings');
-document.addEventListener('click', event => {
- if (settings.open && !settings.contains(event.target)) settings.open = false;
-});
+const settingsToggle = $('settingsToggle');
+function showSettings(open) {
+ settings.hidden = !open;
+ settingsToggle.setAttribute('aria-expanded', String(open));
+}
+settingsToggle.addEventListener('click', () => showSettings(settings.hidden));
 settings.addEventListener('keydown', event => {
- if (event.key !== 'Escape' || !settings.open) return;
+ if (event.key !== 'Escape') return;
  event.stopPropagation();
- settings.open = false;
- settings.querySelector('summary').focus();
+ showSettings(false);
+ settingsToggle.focus();
 });
 
 const theme = $('theme');
@@ -161,6 +164,7 @@ function timeParts(id) {
      if (input.value) input.value = input.value.padStart(2, '0');
    });
    input.addEventListener('paste', event => {
+     if (input.readOnly) return;
      const value = event.clipboardData?.getData('text').trim();
      if (!value || !new RegExp('^\\d{2}(?::?\\d{2}){' + (inputs.length - 1) + '}$').test(value)) return;
      event.preventDefault();
@@ -179,13 +183,15 @@ function timeParts(id) {
    group,
    write,
    value: () => inputs.map(input => input.value).join(':'),
-   read({requireAll = false} = {}) {
+   read({requireAll = false, silent = false} = {}) {
      const invalid = inputs.find(input =>
        (requireAll && !input.value) || (input.value && (!/^\d{1,2}$/.test(input.value) || Number(input.value) > Number(input.dataset.max)))
      );
      if (invalid) {
-       invalid.setAttribute('aria-invalid','true');
-       invalid.focus();
+       if (!silent) {
+         invalid.setAttribute('aria-invalid','true');
+         invalid.focus();
+       }
        return null;
      }
      return inputs.map(input => Number(input.value));
@@ -339,9 +345,34 @@ function renderPauses(now) {
 const defaultLandingDuration = 180000;
 const defaultLandingWarning = 90000;
 const landingDuration = timeParts('heliDuration');
+const landingEta = timeParts('heliEta');
 const landingWarning = timeParts('heliWarning');
-for (const entry of [landingDuration, landingWarning]) {
- entry.group.addEventListener('input', () => { $('heliError').hidden = true; });
+let etaIsSource = false;
+let enteredEta = null;
+
+function formatClockTime(ms) {
+ const date = new Date(ms);
+ return [date.getHours(), date.getMinutes(), date.getSeconds()].map(fmt2).join(':');
+}
+
+function nextEta(parts, now) {
+ const date = new Date(now);
+ date.setHours(...parts, 0);
+ if (date.getTime() <= now) date.setDate(date.getDate() + 1);
+ return date.getTime();
+}
+
+for (const entry of [landingDuration, landingEta, landingWarning]) {
+ entry.group.addEventListener('input', () => {
+   setLandingError('');
+   if (entry === landingDuration) etaIsSource = false;
+   if (entry === landingEta) {
+     etaIsSource = true;
+     const parts = landingEta.read({requireAll:true, silent:true});
+     enteredEta = parts ? nextEta(parts, Date.now()) : null;
+   }
+   render();
+ });
  entry.group.addEventListener('keydown', event => { if (event.key === 'Enter') $('heliStart').click(); });
 }
 const landingRepeat = 8000;
@@ -377,27 +408,31 @@ function setLandingError(message) {
 }
 $('heliStart').addEventListener('click', () => {
  if (state.heli.start !== null) return;
- const durationParts = landingDuration.read();
- const warningParts = durationParts && landingWarning.read();
- if (!durationParts || !warningParts) {
-   setLandingError('Minutter og sekunder må være mellom 00 og 59.');
+ const now = Date.now();
+ const sourceParts = etaIsSource ? landingEta.read({requireAll:true}) : landingDuration.read();
+ const warningParts = sourceParts && landingWarning.read();
+ if (!sourceParts || !warningParts) {
+   setLandingError('Kontroller timer, minutter og sekunder.');
    return;
  }
- const duration = durationMs(durationParts);
+ const eta = etaIsSource ? enteredEta ?? nextEta(sourceParts, now) : now + durationMs(sourceParts);
+ const duration = eta - now;
+ if (duration <= 0) {
+   setLandingError('Angi en forventet landing fram i tid.');
+   return;
+ }
  const warning = durationMs(warningParts);
- if (!duration || warning >= duration) {
-   setLandingError('Varsling må komme før landing. Angi tid fra start i begge feltene.');
-   return;
- }
  getAudio();
  setLandingError('');
- Object.assign(state.heli, {start:performance.now(), duration, warning});
+ Object.assign(state.heli, {start:performance.now(), duration, warning, eta});
  landingWarning.write(formatCountdown(warning));
  render();
 });
 $('heliReset').addEventListener('click', () => {
  stopLandingSound();
  Object.assign(state.heli, {start:null, lastAlarm:null, acknowledged:false});
+ etaIsSource = false;
+ enteredEta = null;
  landingDuration.write(formatCountdown(defaultLandingDuration));
  landingWarning.write(formatCountdown(defaultLandingWarning));
  setLandingError('');
@@ -408,13 +443,13 @@ $('heliAck').addEventListener('click', () => {
  stopLandingSound();
  render();
 });
-function renderLanding() {
+function renderLanding(wallTime) {
  const heli = state.heli;
  const active = heli.start !== null;
  const now = performance.now();
  const elapsed = active ? now - heli.start : 0;
  const ms = (active ? heli.duration : defaultLandingDuration) - elapsed;
- const alert = active && elapsed >= heli.warning && !heli.acknowledged;
+ const alert = active && ms <= heli.warning && !heli.acknowledged;
  if (alert && (heli.lastAlarm === null || now - heli.lastAlarm >= landingRepeat)) {
    heli.lastAlarm = now;
    playLandingSound();
@@ -423,11 +458,18 @@ function renderLanding() {
  $('heliTime').textContent = time;
  $('heliTime').hidden = !active;
  landingDuration.group.hidden = active;
+ landingEta.readOnly(active);
  landingWarning.readOnly(active);
+ const durationParts = landingDuration.read({silent:true});
+ const eta = active ? heli.eta : etaIsSource ? enteredEta
+   : durationParts ? wallTime + durationMs(durationParts) : null;
+ if (!etaIsSource || active) landingEta.write(eta === null ? '' : formatClockTime(eta));
+ if (!active && etaIsSource) landingDuration.write(eta === null ? '' : formatCountdown(Math.max(0, eta - wallTime)));
+ $('heliEtaDay').hidden = eta === null || new Date(eta).toDateString() === new Date(wallTime).toDateString();
  $('heliProgress').max = (active ? heli.duration : defaultLandingDuration) / 1000;
  $('heliProgress').value = Math.min($('heliProgress').max, elapsed / 1000);
  $('heliStartMark').textContent = active ? formatCountdown(heli.duration) + ' Start' : 'Start';
- $('heliWarningMark').textContent = active ? formatCountdown(heli.duration - heli.warning) + ' igjen ved varsel' : 'Varsling';
+ $('heliWarningMark').textContent = active ? formatCountdown(Math.min(heli.duration, heli.warning)) + ' igjen ved varsel' : 'Varsling';
  $('heliBox').classList.toggle('heli-alert', alert);
  $('heliBox').classList.toggle('heli-overtime', ms <= -1000 && !alert);
  $('heliAlarm').hidden = $('heliAck').hidden = !alert;
@@ -473,7 +515,7 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if(b.length>=2&&age>=10000&&b[b.length-1]>b[0]){$('breathRate').textContent=Math.round(60000*(b.length-1)/(b[b.length-1]-b[0]));$('breathStatus').textContent=age>=60000?'60 sekunder passert':'Foreløpig estimat'}else{$('breathRate').textContent='–';$('breathStatus').textContent=b.length?'Avventer 2 pust og 10 sekunder':'Ikke startet'}$('breathBox').classList.toggle('observed',age>=60000);
  renderPauses(now);
  updateActiveClockIndicator(now);
- const landingTime = renderLanding();
+ const landingTime = renderLanding(now);
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
    : c.finished && state.options.countVisual ? 'Ferdig | Nedtelling'
    : landingTime ? landingTime + ' | Landingsvarsel RH' : baseTitle;

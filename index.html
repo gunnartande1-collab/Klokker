@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261114-7">
-    <script src="klokker.js?v=20261114-7" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261114-8">
+    <script src="klokker.js?v=20261114-8" defer></script>
 </head>
 <body data-theme="natt">
     <main class="tool">
@@ -15,36 +15,25 @@
                 <strong>Støtteverktøy</strong>
             </div>
             <div class="header-actions">
-                <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M13 4h7v7m0-7-9 9"/><path d="M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4"/>
-                    </svg>
-                </button>
-                <details class="clock-settings" id="clockSettings">
-                    <summary class="icon-button" title="Innstillinger" aria-label="Innstillinger">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M10 3h4l.6 2.3 2 .9 2.1-1 2 3.4-1.7 1.6v2.6l1.7 1.6-2 3.4-2.1-1-2 .9L14 21h-4l-.6-2.3-2-.9-2.1 1-2-3.4L5 13.8v-2.6L3.3 9.6l2-3.4 2.1 1 2-.9L10 3Z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </summary>
-                    <div class="settings-menu">
-                        <label for="textSize">Tekststørrelse</label>
-                        <select id="textSize">
-                            <option value="normal">100 %</option>
-                            <option value="large">120 %</option>
-                            <option value="extra">140 %</option>
-                        </select>
-                        <label for="theme">Visning</label>
-                        <select id="theme">
-                            <option value="system" selected>Følg systemet</option>
-                            <option value="dag">Dag</option>
-                            <option value="dempet">Dempet</option>
-                            <option value="natt">Natt</option>
-                        </select>
-                    </div>
-                </details>
+                <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">↗</button>
+                <button id="settingsToggle" class="icon-button" type="button" title="Innstillinger" aria-label="Innstillinger" aria-expanded="false" aria-controls="clockSettings">⚙</button>
             </div>
         </header>
+        <div class="settings-menu" id="clockSettings" hidden>
+            <label for="textSize">Zoom:</label>
+            <select id="textSize">
+                <option value="normal">100 %</option>
+                <option value="large">120 %</option>
+                <option value="extra">140 %</option>
+            </select>
+            <label for="theme">Visning:</label>
+            <select id="theme">
+                <option value="system" selected>Følg systemet</option>
+                <option value="dag">Dag</option>
+                <option value="dempet">Dempet</option>
+                <option value="natt">Natt</option>
+            </select>
+        </div>
         <nav class="tabs" aria-label="Klokkeverktøy">
             <button class="tab" data-tab="metronom" aria-selected="false">
                 <span class="tab-symbol brand-small" aria-hidden="true">
@@ -67,17 +56,17 @@
                 <small id="pauseBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="nedtelling" aria-selected="false">
-                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10M7 20h10M8 4v3c0 2 1.5 3.5 4 5-2.5 1.5-4 3-4 5v3m8-16v3c0 2-1.5 3.5-4 5 2.5 1.5 4 3 4 5v3"/><path d="M10 17h4" class="icon-accent"/></svg></span>
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M8 3h16v3l-2 5-5 5 5 5 2 5v3H8v-3l2-5 5-5-5-5-2-5Z" fill="#56a9f5" stroke="#0d294b" stroke-width="2"/><path d="M10 6h12l-2 5-4 4-4-4zm1 20 5-6 5 6Z" fill="#fff0ab"/><path d="M7 3h18M7 29h18" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/></svg></span>
                 Nedtelling
                 <small id="countBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="stoppeklokke" aria-selected="false">
-                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14" r="7"/><path d="M9 3h6m-3 0v4m5 2 2-2"/><path d="M12 10v4l2 1.5" class="icon-accent"/></svg></span>
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M16 4v5m-3-5h6m4 6 2-2" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="19" r="10" fill="#63b6fa" stroke="#0d294b" stroke-width="2"/><circle cx="16" cy="19" r="7" fill="#eef9ff"/><path d="M16 14v5l3 2" fill="none" stroke="#164d80" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="19" r="1.25" fill="#164d80"/></svg></span>
                 Stoppeklokke
                 <small id="stopBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab active" data-tab="pusteteller" aria-selected="true">
-                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v7m0-1-3 3m3-3 3 3M9 7C6 6 3.5 11.5 3.5 16c0 2.7 1.2 3.6 3.6 3.3 2.4-.3 3.3-1.4 3.3-3.5v-2.3M15 7c3-1 5.5 4.5 5.5 9 0 2.7-1.2 3.6-3.6 3.3-2.4-.3-3.3-1.4-3.3-3.5v-2.3"/><path d="M2 6h2m16 0h2" class="icon-accent"/></svg></span>
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M13 10c-3-5-7 0-9 5-2 5-2 10 1 11 3 1 8-1 8-5Zm6 0c3-5 7 0 9 5 2 5 2 10-1 11-3 1-8-1-8-5Z" fill="#ff8299" stroke="#7d314a" stroke-width="2"/><path d="M16 4v10m0 0-5 5m5-5 5 5" fill="none" stroke="#ffe2ec" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                 Pusteteller
             </button>
         </nav>
@@ -221,12 +210,19 @@
             <section class="pane" id="helikopter" hidden inert>
                 <h1>Helikoptervarsling</h1>
                 <div class="display heli-display" id="heliBox">
-                    <span>Forventet landing om (ETE)</span>
-                    <div id="heliDuration" class="time-parts" role="group" aria-label="Tid til forventet landing" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid til forventet landing – timer" data-max="99" value="00"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid til forventet landing – minutter" data-max="59" value="03"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid til forventet landing – sekunder" data-max="59" value="00"></div>
-                    <strong id="heliTime" role="timer" hidden>00:03:00</strong>
-                    <div class="heli-warning-setting">
-                        <span>Varsling etter start</span>
-                        <div id="heliWarning" class="time-parts" role="group" aria-label="Tid fra start til varsling" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid fra start til varsling – timer" data-max="99" value="00"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid fra start til varsling – minutter" data-max="59" value="01"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Tid fra start til varsling – sekunder" data-max="59" value="30"></div>
+                    <div class="heli-entry-row">
+                        <span>ETE · Tid igjen</span>
+                        <div id="heliDuration" class="time-parts" role="group" aria-label="Tid til forventet landing" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – timer" data-max="99" value="00"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – minutter" data-max="59" value="03"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – sekunder" data-max="59" value="00"></div>
+                        <strong id="heliTime" role="timer" hidden>00:03:00</strong>
+                    </div>
+                    <div class="heli-entry-row">
+                        <span>ETA · Klokkeslett</span>
+                        <div id="heliEta" class="time-parts" role="group" aria-label="Forventet landing klokken" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Forventet landing klokken – timer" data-max="23" value=""><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Forventet landing klokken – minutter" data-max="59" value=""><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Forventet landing klokken – sekunder" data-max="59" value=""></div>
+                    </div>
+                    <p id="heliEtaDay" hidden>I morgen</p>
+                    <div class="heli-entry-row heli-warning-setting">
+                        <span>Varsling før ETA</span>
+                        <div id="heliWarning" class="time-parts" role="group" aria-label="Tid fra varsling til forventet landing" aria-describedby="heliError"><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – timer" data-max="99" value="00"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – minutter" data-max="59" value="01"><span aria-hidden="true">:</span><input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid fra varsling til forventet landing – sekunder" data-max="59" value="30"></div>
                     </div>
                     <p id="heliError" role="alert" hidden></p>
                     <progress id="heliProgress" max="180" value="0" aria-label="Nedtellingens fremdrift"></progress>
