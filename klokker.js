@@ -6,7 +6,7 @@ const CONFIG={
 };
 const fmt2=n=>String(Math.max(0,Math.floor(n))).padStart(2,'0');
 const fmtCount=ms=>{let s=Math.ceil(Math.max(0,ms)/1000);return `${fmt2(Math.floor(s/60))}:${fmt2(s%60)}`};
-const fmtStop=ms=>{let s=Math.floor(Math.max(0,ms)/1000);return `${fmt2(s/3600)}:${fmt2(s/60)%60}:${fmt2(s%60)}`};
+const fmtStop=ms=>{let s=Math.floor(Math.max(0,ms)/1000);return `${fmt2(s/3600)}:${fmt2(Math.floor(s/60)%60)}:${fmt2(s%60)}`};
 let audio;
 function getAudio(){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{});return audio}catch{return null}}
 function tone(time,frequency=800,duration=.08,volume=.12,type='sine'){
@@ -26,13 +26,30 @@ function alarm() {
 const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const modes={voksen:110,nyfodt:120};
 const tabs=[...document.querySelectorAll('[data-tab]')];
-function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>p.hidden=p.id!==id)}
+function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>{p.hidden=p.id!==id;p.inert=p.hidden})}
 tabs.forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
 $('openWindow').addEventListener('click',()=>window.open(location.href,'_blank','width=460,height=820,resizable=yes,scrollbars=yes'));
-// Fargevalg lagrer bare visningsvalg, ingen pasientdata.
-let saved='natt';try{saved=localStorage.getItem('opsix-clocks-theme')||'natt'}catch{}
-if(!['dag','dempet','natt'].includes(saved))saved='natt';$('theme').value=saved;document.body.dataset.theme=saved;
-$('theme').addEventListener('change',e=>{const v=e.target.value;document.body.dataset.theme=v;try{localStorage.setItem('opsix-clocks-theme',v)}catch{}});
+const settings = $('clockSettings');
+document.addEventListener('click', event => {
+ if (settings.open && !settings.contains(event.target)) settings.open = false;
+});
+settings.addEventListener('keydown', event => {
+ if (event.key !== 'Escape' || !settings.open) return;
+ event.stopPropagation();
+ settings.open = false;
+ settings.querySelector('summary').focus();
+});
+
+const theme = $('theme');
+const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+ document.body.dataset.theme = theme.value === 'system'
+   ? (darkMode.matches ? 'natt' : 'dag')
+   : theme.value;
+}
+applyTheme();
+theme.addEventListener('change', applyTheme);
+darkMode.addEventListener('change', applyTheme);
 const textSize = $('textSize');
 try {
  const preference = localStorage.getItem('opsix-clocks-text');
