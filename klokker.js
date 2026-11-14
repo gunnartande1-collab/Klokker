@@ -427,6 +427,11 @@ function confirmBeforeLeaving(event) {
  event.returnValue = '1';
 }
 
+const standaloneClockPage = window.self === window.top;
+if (standaloneClockPage) {
+ window.addEventListener('beforeunload', confirmBeforeLeaving);
+}
+
 let leaveGuardEnabled = false;
 function updateLeaveGuard(now) {
  const {metro, count, stop, heli, pauses} = state;
@@ -437,6 +442,7 @@ function updateLeaveGuard(now) {
  if (shouldProtect === leaveGuardEnabled) return;
  leaveGuardEnabled = shouldProtect;
  document.documentElement.toggleAttribute('data-opsix-active-clock', shouldProtect);
+ if (standaloneClockPage) return;
  if (shouldProtect) window.addEventListener('beforeunload', confirmBeforeLeaving);
  else window.removeEventListener('beforeunload', confirmBeforeLeaving);
 }
