@@ -5,22 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css">
-    <script src="klokker.js" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261114-1">
+    <script src="klokker.js?v=20261114-1" defer></script>
 </head>
 <body data-theme="natt">
     <main class="tool">
         <header class="top">
-            <div class="brand-icon" aria-hidden="true">
-                <svg viewBox="0 0 48 48" fill="none">
-                    <path d="M10 38 19 8h10l9 30H10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
-                    <path d="M24 13v20" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
-                    <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2" stroke-linejoin="round"/>
-                </svg>
-            </div>
             <div class="brand-title">
                 <strong>Støtteverktøy</strong>
-                <span>Klokkeverktøy</span>
             </div>
             <div class="header-actions">
                 <label class="theme-label" for="theme">Visning</label>
@@ -33,7 +25,31 @@
             </div>
         </header>
         <nav class="tabs" aria-label="Klokkeverktøy">
-            <button class="tab active" data-tab="metronom" aria-selected="true">
+            <button class="tab active" data-tab="pusteteller" aria-selected="true">
+                <span class="tab-symbol">♧</span>
+                Pusteteller
+            </button>
+            <button class="tab" data-tab="pause" aria-selected="false">
+                <span class="tab-symbol">☕</span>
+                Pause
+                <small id="pauseBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="stoppeklokke" aria-selected="false">
+                <span class="tab-symbol">⏱</span>
+                Stoppeklokke
+                <small id="stopBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="nedtelling" aria-selected="false">
+                <span class="tab-symbol">◴</span>
+                Nedtelling
+                <small id="countBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="helikopter" aria-selected="false">
+                <span class="tab-symbol">🚁</span>
+                Helikopter
+                <small id="heliBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="metronom" aria-selected="false">
                 <span class="tab-symbol brand-small" aria-hidden="true">
                     <svg viewBox="0 0 48 48" fill="none">
                         <path d="M10 38 19 8h10l9 30H10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
@@ -43,32 +59,8 @@
                 </span>
                 Metronom
             </button>
-            <button class="tab" data-tab="nedtelling" aria-selected="false">
-                <span class="tab-symbol">◴</span>
-                Nedtelling
-                <small id="countBadge" class="tab-status" hidden></small>
-            </button>
-            <button class="tab" data-tab="stoppeklokke" aria-selected="false">
-                <span class="tab-symbol">⏱</span>
-                Stoppeklokke
-                <small id="stopBadge" class="tab-status" hidden></small>
-            </button>
-            <button class="tab" data-tab="pusteteller" aria-selected="false">
-                <span class="tab-symbol">♧</span>
-                Pusteteller
-            </button>
-            <button class="tab" data-tab="pause" aria-selected="false">
-                <span class="tab-symbol">☕</span>
-                Pause
-                <small id="pauseBadge" class="tab-status" hidden></small>
-            </button>
-            <button class="tab" data-tab="helikopter" aria-selected="false">
-                <span class="tab-symbol">🚁</span>
-                Helikopter
-                <small id="heliBadge" class="tab-status" hidden></small>
-            </button>
         </nav>
-        <section class="pane" id="metronom">
+        <section class="pane" id="metronom" hidden>
             <h1>Metronom</h1>
             <div class="display beat-display" id="beatDisplay">
                 <div id="bpmView" class="bpm-view">
@@ -76,11 +68,21 @@
                         110 
                         <span>BPM</span>
                     </button>
-                    <input id="bpmDirect" class="bpm-direct" type="number" min="100" max="120" inputmode="numeric" aria-label="Ny takt" hidden>
+                    <input id="bpmDirect" class="bpm-direct" type="number" min="1" inputmode="numeric" aria-label="Ny takt" hidden>
                 </div>
                 <div class="pulse-line" aria-hidden="true">
-                    <svg viewBox="0 0 240 24" preserveAspectRatio="none">
-                        <path d="M0 12 H99 L106 12 L112 5 L118 20 L124 7 L130 12 H240" stroke="currentColor" fill="none" stroke-width="1.8"/>
+                    <svg viewBox="0 0 240 42" preserveAspectRatio="none">
+                        <defs>
+                            <path id="ecgComplex" d="M0 25 H7 Q12 18 17 25 H22 L26 28 L30 7 L34 34 L39 25 H43 Q49 16 55 25 H60"/>
+                        </defs>
+                        <g class="ecg-trace">
+                            <use href="#ecgComplex"/>
+                            <use href="#ecgComplex" x="60"/>
+                            <use href="#ecgComplex" x="120"/>
+                            <use id="ecgFourth" href="#ecgComplex" x="180"/>
+                            <path id="ecgVent" d="M180 25 H240" hidden/>
+                        </g>
+                        <line id="beatCursor" x1="30" x2="30" y1="1" y2="41" hidden/>
                     </svg>
                 </div>
             </div>
@@ -95,7 +97,7 @@
                 <label for="bpmInput">Juster takt</label>
                 <div>
                     <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
-                    <input id="bpmInput" type="number" inputmode="numeric" min="100" max="120" step="1" value="110">
+                    <input id="bpmInput" type="number" inputmode="numeric" min="1" step="1" value="110">
                     <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
                 </div>
             </div>
@@ -109,29 +111,23 @@
         <section class="pane" id="nedtelling" hidden>
             <h1>Nedtelling</h1>
             <div class="display time-display" id="countBox">
-                <strong id="countDisplay">03:00</strong>
+                <input id="countDisplay" class="count-entry" type="text" inputmode="numeric"
+                       value="00:00:00" aria-label="Nedtellingstid" aria-describedby="countFormat countError"
+                       autocomplete="off" spellcheck="false">
+                <span id="countFormat">tt:mm:ss</span>
                 <span id="countState">Klar</span>
-            </div>
-            <div class="time-settings">
-                <label>
-                    Minutter
-                    <input id="countMinutes" type="number" min="0" max="999" value="3" inputmode="numeric">
-                </label>
-                <label>
-                    Sekunder
-                    <input id="countSeconds" type="number" min="0" max="59" value="0" inputmode="numeric">
-                </label>
+                <span id="countError" role="alert" hidden>Bruk tt:mm:ss. Minutter og sekunder må være mellom 00 og 59.</span>
             </div>
             <div class="toggle-list">
                 <div class="toggle-row">
-                    <span>Lydvarsel ved 00:00?</span>
+                    <span>Lydvarsel ved 00:00:00?</span>
                     <div class="binary" data-setting="countSound">
                         <button class="selected" data-value="yes">Ja</button>
                         <button data-value="no">Nei</button>
                     </div>
                 </div>
                 <div class="toggle-row">
-                    <span>Visuell varsling ved 00:00?</span>
+                    <span>Visuell varsling ved 00:00:00?</span>
                     <div class="binary" data-setting="countVisual">
                         <button class="selected" data-value="yes">Ja</button>
                         <button data-value="no">Nei</button>
@@ -156,7 +152,7 @@
                 <button id="stopReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
-        <section class="pane" id="pusteteller" hidden>
+        <section class="pane" id="pusteteller">
             <h1>Pusteteller</h1>
             <p class="subtitle">
                 Trykk én gang for hvert observerte åndedrag.
@@ -177,23 +173,20 @@
                 <span class="observation" id="breathStatus">Ikke startet</span>
             </div>
             <button type="button" class="btn primary big-breath" id="breathTap">+ Registrer pust</button>
-            <div class="actions single">
+            <div class="actions two">
+                <button id="breathUndo" class="btn" type="button" disabled>− Fjern siste pust</button>
                 <button id="breathReset" class="btn">↻ Nullstill</button>
             </div>
         </section>
         <section class="pane" id="pause" hidden>
             <h1>Pause</h1>
-            <div class="pause-setting">
-                <label for="mealTime">Matpause – angi klokkeslett</label>
-                <input id="mealTime" type="time">
-                <label for="mealLength">Varighet (minutter)</label>
-                <input id="mealLength" type="number" value="30" min="1" max="240">
+            <div class="display pause-time-row">
+                <label for="mealTime">Matpause</label>
+                <div><span aria-hidden="true">kl:</span> <input id="mealTime" type="text" inputmode="numeric" placeholder="--:--" maxlength="5" autocomplete="off"></div>
             </div>
-            <div class="pause-setting">
-                <label for="screenTime">Skjermpause – angi klokkeslett</label>
-                <input id="screenTime" type="time">
-                <label for="screenLength">Varighet (minutter)</label>
-                <input id="screenLength" type="number" value="5" min="1" max="120">
+            <div class="display pause-time-row">
+                <label for="screenTime">Skjermpause</label>
+                <div><span aria-hidden="true">kl:</span> <input id="screenTime" type="text" inputmode="numeric" placeholder="--:--" maxlength="5" autocomplete="off"></div>
             </div>
             <div class="toggle-row">
                 <span>Lydvarsel når pausen starter?</span>
@@ -202,11 +195,7 @@
                     <button class="selected" data-value="no">Nei</button>
                 </div>
             </div>
-            <p class="hint compact">Klokkeslett gjelder i dag. Varsling fungerer når klokkevinduet er åpent og nettleseren tillater lyd.</p>
-            <div class="display pause-display">
-                <strong id="pauseState">Ingen pause satt</strong>
-                <span id="pauseDetail">Angi tidspunkter over</span>
-            </div>
+            <p id="pauseState" role="status"></p>
             <div class="actions two">
                 <button class="btn primary" id="pauseSave">Lagre pauser</button>
                 <button class="btn" id="pauseReset">↻ Nullstill</button>
@@ -214,13 +203,19 @@
         </section>
         <section class="pane" id="helikopter" hidden>
             <h1>Helikoptervarsling</h1>
-            <div class="display heli-display">
-                <strong>03:00</strong>
-                <span>Redningshelikopter – 3 min</span>
+            <div class="display heli-display" id="heliBox">
+                <span>Tid til forventet landing</span>
+                <strong id="heliTime" role="timer">03:00</strong>
+                <progress id="heliProgress" max="180" value="0" aria-label="Nedtellingens fremdrift"></progress>
+                <div class="heli-markers"><span>03:00 Start</span><span>01:30 Varsling</span><span>00:00 Landing</span></div>
+                <p id="heliAlarm" role="alert" hidden>🔔 Aktiver landingsvarsel!</p>
+                <button id="heliAck" class="btn full" type="button" hidden>✓ Varsling aktivert</button>
             </div>
-            <p class="hint">Denne funksjonen skal kobles til den eksisterende, godkjente varslingen i Luftambulansekoordinator. Ingen separat alarm starter her.</p>
-            <button id="heliOpen" class="btn primary full">Åpne eksisterende varsling ↗</button>
-            <p class="hint compact" id="heliConfigHint"></p>
+            <div class="actions two">
+                <button id="heliStart" class="btn primary" type="button">▶ Start</button>
+                <button id="heliReset" class="btn" type="button">↻ Nullstill</button>
+            </div>
+            <button id="heliTest" class="btn full heli-test" type="button">Test lyd</button>
         </section>
         <footer class="footer">
             <span class="live-dot"></span>
