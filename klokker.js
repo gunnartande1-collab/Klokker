@@ -8,7 +8,7 @@ const fmt2=n=>String(Math.max(0,Math.floor(n))).padStart(2,'0');
 const fmtCount=ms=>{let s=Math.ceil(Math.max(0,ms)/1000);return `${fmt2(Math.floor(s/60))}:${fmt2(s%60)}`};
 const fmtStop=ms=>{let s=Math.floor(Math.max(0,ms)/1000);return `${fmt2(s/3600)}:${fmt2(Math.floor(s/60)%60)}:${fmt2(s%60)}`};
 let audio;
-function getAudio(){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume().catch(()=>{});return audio}catch{return null}}
+function getAudio(resume = true){try{audio ||= new (window.AudioContext||window.webkitAudioContext)();if(resume && audio.state==='suspended')audio.resume().catch(()=>{});return audio}catch{return null}}
 function tone(time,frequency=800,duration=.08,volume=.12,type='sine'){
  const a=getAudio();if(!a)return;try{const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=frequency;g.gain.setValueAtTime(.0001,time);g.gain.exponentialRampToValueAtTime(volume,time+.009);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g).connect(a.destination);o.start(time);o.stop(time+duration+.02);return o}catch{}
 }
@@ -23,7 +23,7 @@ function alarm() {
    }
  }
 }
-const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:false},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
+const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:true},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const modes={voksen:110,nyfodt:120};
 const tabs=[...document.querySelectorAll('[data-tab]')];
 function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>{p.hidden=p.id!==id;p.inert=p.hidden})}
@@ -204,6 +204,18 @@ const countInput = timeParts('countDisplay');
 const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
 const countBox = $('countBox');
+const countSteps = [...countInput.group.querySelectorAll('[data-step]')];
+for (const button of countSteps) {
+ button.addEventListener('click', () => {
+   if (state.count.running) return;
+   const input = button.closest('.count-segment').querySelector('input');
+   const limit = Number(input.dataset.max);
+   const value = Number(input.value);
+   const next = Math.max(0, Math.min(limit, value + Number(button.dataset.step)));
+   input.value = fmt2(next);
+   countInput.group.dispatchEvent(new Event('input', {bubbles:true}));
+ });
+}
 function remaining() {
  const countdown = state.count;
  return countdown.running ? Math.max(0, countdown.end - Date.now()) : countdown.remaining;
@@ -226,7 +238,7 @@ countInput.group.addEventListener('input', () => {
  render();
 });
 countInput.group.addEventListener('keydown', event => {
- if (event.key === 'Enter') $('countStart').click();
+ if (event.key === 'Enter' && event.target.matches('input')) $('countStart').click();
 });
 $('countStart').addEventListener('click', () => {
  const countdown = state.count;
@@ -276,22 +288,46 @@ $('countReset').addEventListener('click', () => {
  $('countError').hidden = true;
  render();
 });
-for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){if(state.options.pauseSound)getAudio();schedulePauseAudio()}if(opt==='countVisual'&&!state.options.countVisual){countBox.classList.remove('count-flash');countTab.classList.remove('count-flash')}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
+for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){cancelPauseAudio();schedulePauseAudio()}if(opt==='countVisual'&&!state.options.countVisual){countBox.classList.remove('count-flash');countTab.classList.remove('count-flash')}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
 $('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
 for (const [, field] of pauseFields) field.group.addEventListener('input', () => { $('pauseError').hidden = true; });
 const pauseAlertDuration = 5 * 60 * 1000;
 const pauseTones = new Set();
-function schedulePauseAudio() {
+let pauseAudioRevision = 0;
+function cancelPauseAudio() {
+ pauseAudioRevision++;
+ for (const pause of state.pauses) {
+   if (pause.soundStart !== null && audio.currentTime >= pause.soundStart) pause.played = true;
+   pause.soundStart = null;
+ }
  stopTones(pauseTones);
- if (!state.options.pauseSound || !audio) return;
+}
+
+async function schedulePauseAudio() {
+ const error = $('pauseSoundError');
+ error.hidden = true;
+ if (!state.options.pauseSound || !state.pauses.some(pause => !pause.played)) return;
+ const revision = pauseAudioRevision;
+ const context = getAudio(false);
+ try {
+   if (context && context.state !== 'running') await context.resume();
+ } catch {
+   // The visual reminder works even when the browser blocks sound.
+ }
+ if (revision !== pauseAudioRevision) return;
+ if (!context || context.state !== 'running') {
+   error.hidden = false;
+   return;
+ }
  const now = Date.now();
  for (const pause of state.pauses) {
-   if (pause.notified || now >= pause.time + pauseAlertDuration) continue;
-   const start = audio.currentTime + Math.max(.03, (pause.time - now) / 1000);
+   if (pause.played || now >= pause.time + pauseAlertDuration) continue;
+   const start = context.currentTime + Math.max(.03, (pause.time - now) / 1000);
+   pause.soundStart = start;
    for (const [delay, frequency] of pauseNotes) {
-     trackTone(pauseTones, tone(start + delay, frequency, .23, .18));
+     trackTone(pauseTones, tone(start + delay, frequency, .23, .24));
    }
  }
 }
@@ -313,26 +349,24 @@ $('pauseSave').addEventListener('click', () => {
    if (date.getTime() + 60000 <= now) date.setDate(date.getDate() + 1);
    const timeMs = date.getTime();
    const existing = state.pauses.find(pause => pause.field === field && pause.time === timeMs);
-   pauses.push({type, field, time:timeMs, label, notified:existing?.notified ?? false});
+   pauses.push(existing ?? {type, field, time:timeMs, label, played:false, soundStart:null});
  }
  $('pauseError').hidden = true;
+ cancelPauseAudio();
  state.pauses = pauses;
- if (state.options.pauseSound) getAudio();
  schedulePauseAudio();
  render();
 });
 $('pauseReset').addEventListener('click', () => {
  $('pauseError').hidden = true;
+ cancelPauseAudio();
  state.pauses = [];
- stopTones(pauseTones);
+ $('pauseSoundError').hidden = true;
  for (const [, field] of pauseFields) field.write('');
  render();
 });
 function renderPauses(now) {
  const due = state.pauses.filter(pause => now >= pause.time && now < pause.time + pauseAlertDuration);
- for (const pause of state.pauses) {
-   if (now >= pause.time) pause.notified = true;
- }
  for (const [, field] of pauseFields) {
    field.group.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
  }
@@ -522,7 +556,10 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  const displayedTime = formatCountdown(remaining());
  if (!c.edited && countInput.value() !== displayedTime) countInput.write(displayedTime);
  countInput.readOnly(c.running);
- $('countState').textContent = c.finished ? 'FERDIG' : c.running ? 'Nedtelling pågår' : c.remaining !== c.initial ? 'Pauset' : 'Klar';
+ for (const button of countSteps) button.disabled = c.running;
+ const countMessage = c.running ? 'Nedtelling pågår' : c.paused ? 'Pauset' : '';
+ $('countState').textContent = countMessage;
+ $('countState').hidden = !countMessage;
  const countAlert = c.finished && state.options.countVisual;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
@@ -532,7 +569,9 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('breathUndo').disabled = !state.breaths.length;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
- if(b.length>=2&&age>=10000&&b[b.length-1]>b[0]){$('breathRate').textContent=Math.round(60000*(b.length-1)/(b[b.length-1]-b[0]));$('breathStatus').textContent=age>=60000?'60 sekunder passert':'Foreløpig estimat'}else{$('breathRate').textContent='–';$('breathStatus').textContent=b.length?'Avventer 2 pust og 10 sekunder':'Ikke startet'}$('breathBox').classList.toggle('observed',age>=60000);
+ const hasBreathEstimate = b.length >= 2 && age >= 10000 && b[b.length - 1] > b[0];
+ $('breathRate').textContent = hasBreathEstimate ? Math.round(60000 * (b.length - 1) / (b[b.length - 1] - b[0])) : '–';
+ $('breathBox').classList.toggle('observed', age >= 60000);
  renderPauses(now);
  updateActiveClockIndicator(now);
  const landingTime = renderLanding(now);
@@ -540,7 +579,6 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
    : c.finished && state.options.countVisual ? 'Ferdig | Nedtelling'
    : landingTime ? landingTime + ' | Landingsvarsel RH' : baseTitle;
  if (document.title !== title) document.title = title;
- const active=[m.running?'Metronom':'',c.running?'Nedtelling':'',s.running?'Stoppeklokke':'',landingTime?'Helikoptervarsling':''].filter(Boolean);$('activityText').textContent=active.length?`Aktiv: ${active.join(', ')}`:'Ingen aktive klokker';document.querySelector('.live-dot').classList.toggle('on',active.length>0);
 }
 setInterval(()=>{scheduleMetro();render()},60);
 document.addEventListener('visibilitychange', render);
