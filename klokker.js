@@ -19,7 +19,7 @@ function alarm() {
  if (!context || context.state !== 'running') return;
  for (const repeat of [0, 1.25]) {
    for (const delay of [0, .26, .52]) {
-     trackTone(countTones, tone(context.currentTime + .02 + repeat + delay, 840, .15, .18, 'triangle'));
+     trackTone(countTones, tone(context.currentTime + .02 + repeat + delay, 840, .15, .23, 'triangle'));
    }
  }
 }
@@ -129,7 +129,7 @@ function scheduleMetro() {
    if (when >= now + .12) break;
    const ventilation = metro.mode === 'nyfodt' && metro.step % 4 === 3;
    const duration = Math.min(ventilation ? .16 : .065, Math.max(.012, interval * .7));
-   trackTone(metroTones, tone(when, ventilation ? 500 : 880, duration, ventilation ? .36 : .34));
+   trackTone(metroTones, tone(when, ventilation ? 500 : 880, duration, ventilation ? .468 : .442));
    metro.step++;
  }
 }
@@ -205,15 +205,16 @@ const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
 const countBox = $('countBox');
 const countSteps = [...countInput.group.querySelectorAll('[data-step]')];
-for (const button of countSteps) {
- button.addEventListener('click', () => {
-   if (state.count.running) return;
-   const input = button.closest('.count-segment').querySelector('input');
+for (const group of document.querySelectorAll('.adjustable-time')) {
+ group.addEventListener('click', event => {
+   const button = event.target.closest('[data-step]');
+   if (!button || button.disabled) return;
+   const input = button.closest('.time-segment').querySelector('input');
+   if (input.readOnly) return;
    const limit = Number(input.dataset.max);
-   const value = Number(input.value);
-   const next = Math.max(0, Math.min(limit, value + Number(button.dataset.step)));
+   const next = Math.max(0, Math.min(limit, Number(input.value) + Number(button.dataset.step)));
    input.value = fmt2(next);
-   countInput.group.dispatchEvent(new Event('input', {bubbles:true}));
+   group.dispatchEvent(new Event('input', {bubbles:true}));
  });
 }
 function remaining() {

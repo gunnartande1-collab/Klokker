@@ -261,10 +261,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
   gap: 8px 12px;
 }
 .time-card .time-row + .time-row { margin-top: 12px; }
-.time-row > .time-value, .pause-clock { margin-inline-start: auto; }
-.pause-clock { display: flex; align-items: center; gap: 6px; }
-.pause-clock > span { font-size: .875em; }
-.display .pause-clock .time-value { inline-size: 6.2ch; }
+.time-row > .time-value { margin-inline-start: auto; }
 .time-card .time-label {
   color: inherit;
   font-size: calc(15px * var(--text-scale, 1));
@@ -281,30 +278,33 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 body[data-theme="dag"] .display .time-value { color: inherit; }
 
-#countDisplay { align-items: center; }
-.count-segment {
+.display .adjustable-time {
+  align-items: flex-start;
+  inline-size: auto;
+}
+.time-segment {
   display: grid;
   justify-items: center;
-  gap: 2px;
-  min-width: 0;
+  gap: 4px;
 }
-#countDisplay .count-segment input { box-shadow: none; }
-.count-step {
+.time-segment input:not(:read-only) { box-shadow: none; }
+.time-steps { display: flex; gap: 3px; }
+.time-step {
   display: grid;
   place-items: center;
-  width: 32px;
+  width: 24px;
   min-height: 24px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--field);
-  color: var(--text);
-  font: 700 15px/1 system-ui;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: 650 14px/1 system-ui;
   cursor: pointer;
 }
-.count-step:hover { outline: 1px solid currentColor; }
-.count-step:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
-.count-step:disabled { visibility: hidden; }
+.time-step:hover { background: var(--field); color: var(--text); }
+.time-step:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.time-step:disabled { visibility: hidden; }
 
 #breathBox #breathCount {
   font-size: clamp(38px, calc(10vw * var(--text-scale, 1)), calc(48px * var(--text-scale, 1)));
