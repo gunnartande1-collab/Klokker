@@ -1,6 +1,7 @@
 (() => {
 'use strict';
-const $=id=>document.getElementById(id);
+const tool = document.getElementById('clockTool');
+const $ = id => tool.querySelector('#' + id) ?? document.getElementById(id);
 const CONFIG={
   feedbackUrl:'mailto:b32838@ous-hf.no?subject=Tilbakemelding%20OPSIX%20klokkeverkt%C3%B8y'
 };
@@ -23,11 +24,115 @@ function alarm() {
    }
  }
 }
-const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,countVisual:true,pauseSound:true},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
+const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,pauseSound:true},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const modes={voksen:110,nyfodt:120};
-const tabs=[...document.querySelectorAll('[data-tab]')];
-function tab(id){for(const b of tabs){let sel=b.dataset.tab===id;b.classList.toggle('active',sel);b.setAttribute('aria-selected',String(sel))}document.querySelectorAll('.pane').forEach(p=>{p.hidden=p.id!==id;p.inert=p.hidden})}
-tabs.forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
+const tabs = [...tool.querySelectorAll('[data-tab]')];
+const panes = $('clockPanes');
+const toggleFloatingPane = $('toggleFloatingPane');
+let floatingWindow = null;
+let lastTool = tabs.find(button => button.classList.contains('active')).dataset.tab;
+let activeTool = lastTool;
+
+function tab(id) {
+ activeTool = id;
+ if (id) lastTool = id;
+ for (const button of tabs) {
+   const selected = button.dataset.tab === id;
+   button.classList.toggle('active', selected);
+   button.setAttribute('aria-selected', String(selected));
+ }
+ for (const pane of panes.children) {
+   pane.hidden = pane.id !== id;
+   pane.inert = pane.hidden;
+ }
+ if (floatingWindow) {
+   panes.hidden = !id;
+   toggleFloatingPane.textContent = id ? '→' : '←';
+   toggleFloatingPane.setAttribute('aria-expanded', String(!!id));
+   toggleFloatingPane.setAttribute('aria-label', id ? 'Skjul verktøypanelet' : 'Vis sist brukte verktøy');
+ }
+}
+
+function toggleTool(id) {
+ const wasOpen = !!activeTool;
+ tab(id);
+ if (floatingWindow && wasOpen !== !!id) {
+   const collapsedWidth = 124;
+   const expandedWidth = 510;
+   const width = id ? expandedWidth : collapsedWidth;
+   try {
+     floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
+   } catch {
+     // The browser can limit resizing. The window can still be resized manually.
+   }
+ }
+}
+for (const button of tabs) {
+ button.addEventListener('click', () => toggleTool(floatingWindow && activeTool === button.dataset.tab ? null : button.dataset.tab));
+}
+toggleFloatingPane.addEventListener('click', () => toggleTool(activeTool ? null : lastTool));
+
+const floatingNotice = $('floatingNotice');
+const floatingError = $('floatingError');
+const floatingLaunch = $('openFloating');
+const clockStylesheet = document.querySelector('link[rel="stylesheet"]').href;
+const toolHome = tool.parentNode;
+const toolNext = tool.nextSibling;
+
+floatingLaunch.addEventListener('click', async () => {
+ floatingError.hidden = true;
+ if (!window.documentPictureInPicture || window.top !== window) {
+   floatingError.textContent = window.top !== window
+     ? 'Åpne Klokkeverktøy i en egen fane for å bruke det flytende vinduet.'
+     : 'Nettleseren støtter ikke flytende verktøy. Du kan fortsette å bruke denne fanen.';
+   floatingError.hidden = false;
+   return;
+ }
+ if (floatingWindow) return;
+ floatingLaunch.disabled = true;
+ try {
+   const popup = await window.documentPictureInPicture.requestWindow({width:124, height:520});
+   popup.addEventListener('pagehide', () => {
+     if (floatingWindow !== popup) return;
+     floatingWindow = null;
+     toolHome.insertBefore(tool, toolNext);
+     panes.hidden = false;
+     toggleFloatingPane.hidden = true;
+     floatingNotice.hidden = true;
+     tab(lastTool);
+     runClockUpdates(window);
+     floatingLaunch.focus();
+   }, {once:true});
+   floatingWindow = popup;
+   popup.document.documentElement.lang = document.documentElement.lang;
+   popup.document.title = 'OPSIX Klokkeverktøy';
+   const stylesheet = popup.document.createElement('link');
+   stylesheet.rel = 'stylesheet';
+   stylesheet.href = clockStylesheet;
+   popup.document.head.append(stylesheet);
+   popup.document.body.classList.add('floating-clocks');
+   syncFloatingAppearance();
+   popup.document.body.append(tool);
+   floatingNotice.hidden = false;
+   toggleFloatingPane.hidden = false;
+   tab(null);
+   runClockUpdates(popup);
+   tabs[0].focus();
+ } catch {
+   floatingWindow?.close();
+   floatingError.textContent = 'Kunne ikke åpne flytende verktøy. Du kan fortsette å bruke denne fanen.';
+   floatingError.hidden = false;
+ } finally {
+   floatingLaunch.disabled = false;
+ }
+});
+$('returnFloating').addEventListener('click', () => floatingWindow?.close());
+
+function syncFloatingAppearance() {
+ if (!floatingWindow) return;
+ floatingWindow.document.body.dataset.theme = document.body.dataset.theme;
+ floatingWindow.document.body.dataset.textSize = document.body.dataset.textSize;
+}
 $('openWindow').addEventListener('click',()=>window.open(location.href,'_blank','width=460,height=820,resizable=yes,scrollbars=yes'));
 const settings = $('clockSettings');
 const settingsToggle = $('settingsToggle');
@@ -49,6 +154,7 @@ function applyTheme() {
  document.body.dataset.theme = theme.value === 'system'
    ? (darkMode.matches ? 'natt' : 'dag')
    : theme.value;
+ syncFloatingAppearance();
 }
 applyTheme();
 theme.addEventListener('change', applyTheme);
@@ -61,9 +167,10 @@ try {
 document.body.dataset.textSize = textSize.value;
 textSize.addEventListener('change', () => {
  document.body.dataset.textSize = textSize.value;
+ syncFloatingAppearance();
  try { localStorage.setItem('opsix-clocks-text', textSize.value); } catch {}
 });
-function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];$('metronomeHint').hidden=mode!=='nyfodt';document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();restartMetroCycle();$('ecgFourth').toggleAttribute('hidden',mode==='nyfodt');$('ecgVent').toggleAttribute('hidden',mode!=='nyfodt')}
+function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];$('metronomeHint').hidden=mode!=='nyfodt';tool.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();restartMetroCycle();$('ecgFourth').toggleAttribute('hidden',mode==='nyfodt');$('ecgVent').toggleAttribute('hidden',mode!=='nyfodt')}
 function updateBpmView(){const m=state.metro;$('bpmLabel').innerHTML=m.mode==='nyfodt'?'3:1 <span>HLR</span>':`${m.bpm} <span>BPM</span>`;$('bpmInput').value=m.bpm;$('bpmDirect').value=m.bpm}
 function setBpm(value) {
  const metro = state.metro;
@@ -75,7 +182,7 @@ function setBpm(value) {
  }
  updateBpmView();
 }
-document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+tool.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 $('bpmDown').addEventListener('click',()=>setBpm(state.metro.bpm-1));$('bpmUp').addEventListener('click',()=>setBpm(state.metro.bpm+1));$('bpmInput').addEventListener('change',e=>setBpm(e.target.value));
 $('bpmLabel').addEventListener('click',()=>{if(state.metro.mode==='nyfodt')return;$('bpmLabel').hidden=true;$('bpmDirect').hidden=false;$('bpmDirect').focus();$('bpmDirect').select()});
 function closeBpm(){setBpm($('bpmDirect').value);$('bpmDirect').hidden=true;$('bpmLabel').hidden=false}
@@ -143,12 +250,13 @@ function drawBeatCursor() {
    cursor.setAttribute('x1', x);
    cursor.setAttribute('x2', x);
  }
- requestAnimationFrame(drawBeatCursor);
+ clockFrame = clockWindow.requestAnimationFrame(drawBeatCursor);
 }
 
 function timeParts(id) {
  const group = $(id);
  const inputs = [...group.querySelectorAll('input')];
+ const stepButtons = group.querySelectorAll('[data-step]');
  const clearError = () => inputs.forEach(input => input.removeAttribute('aria-invalid'));
  inputs.forEach((input, index) => {
    input.addEventListener('focus', () => input.select());
@@ -196,7 +304,10 @@ function timeParts(id) {
      }
      return inputs.map(input => Number(input.value));
    },
-   readOnly: value => inputs.forEach(input => { input.readOnly = value; })
+   readOnly(value) {
+     for (const input of inputs) input.readOnly = value;
+     for (const button of stepButtons) button.disabled = value;
+   }
  };
 }
 const durationMs = ([hours, minutes, seconds]) => (hours * 3600 + minutes * 60 + seconds) * 1000;
@@ -204,7 +315,6 @@ const countInput = timeParts('countDisplay');
 const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
 const countBox = $('countBox');
-const countSteps = [...countInput.group.querySelectorAll('[data-step]')];
 for (const group of document.querySelectorAll('.adjustable-time')) {
  group.addEventListener('click', event => {
    const button = event.target.closest('[data-step]');
@@ -267,10 +377,8 @@ function finishCountdown() {
  countdown.remaining = 0;
  countdown.finished = true;
  if (state.options.countSound) alarm();
- if (state.options.countVisual) {
-   const target = $('nedtelling').hidden ? countTab : countBox;
-   target.classList.add('count-flash');
- }
+ const target = $('nedtelling').hidden ? countTab : countBox;
+ target.classList.add('count-flash');
 }
 $('countPause').addEventListener('click', () => {
  const countdown = state.count;
@@ -289,7 +397,7 @@ $('countReset').addEventListener('click', () => {
  $('countError').hidden = true;
  render();
 });
-for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){cancelPauseAudio();schedulePauseAudio()}if(opt==='countVisual'&&!state.options.countVisual){countBox.classList.remove('count-flash');countTab.classList.remove('count-flash')}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
+for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){cancelPauseAudio();schedulePauseAudio()}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
 $('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
@@ -371,7 +479,7 @@ function renderPauses(now) {
  for (const [, field] of pauseFields) {
    field.group.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
  }
- document.querySelector('[data-tab="pause"]').classList.toggle('pause-due', !!due.length);
+ tool.querySelector('[data-tab="pause"]').classList.toggle('pause-due', !!due.length);
  $('pauseBadge').hidden = !due.length;
  $('pauseBadge').textContent = due.length ? 'NÅ' : '';
  const next = state.pauses.filter(pause => pause.time > now).sort((a,b) => a.time-b.time)[0];
@@ -416,7 +524,7 @@ for (const entry of [landingDuration, landingEta, landingWarning]) {
    }
    render();
  });
- entry.group.addEventListener('keydown', event => { if (event.key === 'Enter') $('heliStart').click(); });
+ entry.group.addEventListener('keydown', event => { if (event.key === 'Enter' && event.target.matches('input')) $('heliStart').click(); });
 }
 const landingRepeat = 8000;
 const landingTones = new Set();
@@ -506,7 +614,7 @@ function renderLanding(wallTime) {
  const durationParts = landingDuration.read({silent:true});
  const eta = active ? heli.eta : previewEta;
  if (!etaIsSource || active) landingEta.write(eta === null ? '00:00:00' : formatClockTime(eta));
- if (!active && !landingDuration.group.contains(document.activeElement)) {
+ if (!active && !landingDuration.group.contains(tool.ownerDocument.activeElement)) {
    if (eta !== null) landingDuration.write(formatCountdown(Math.max(0, eta - wallTime)));
    else if (etaIsSource) landingDuration.write('00:00:00');
  }
@@ -557,11 +665,10 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  const displayedTime = formatCountdown(remaining());
  if (!c.edited && countInput.value() !== displayedTime) countInput.write(displayedTime);
  countInput.readOnly(c.running);
- for (const button of countSteps) button.disabled = c.running;
  const countMessage = c.running ? 'Nedtelling pågår' : c.paused ? 'Pauset' : '';
  $('countState').textContent = countMessage;
  $('countState').hidden = !countMessage;
- const countAlert = c.finished && state.options.countVisual;
+ const countAlert = c.finished;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
  const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);
@@ -577,14 +684,24 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  updateActiveClockIndicator(now);
  const landingTime = renderLanding(now);
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
-   : c.finished && state.options.countVisual ? 'Ferdig | Nedtelling'
+   : c.finished ? 'Ferdig | Nedtelling'
    : landingTime ? landingTime + ' | Landingsvarsel RH' : baseTitle;
  if (document.title !== title) document.title = title;
 }
-setInterval(()=>{scheduleMetro();render()},60);
+let clockWindow = window;
+let clockInterval;
+let clockFrame;
+function runClockUpdates(target) {
+ clockWindow.clearInterval(clockInterval);
+ if (clockFrame !== undefined) clockWindow.cancelAnimationFrame(clockFrame);
+ clockWindow = target;
+ clockInterval = target.setInterval(() => { scheduleMetro(); render(); }, 60);
+ clockFrame = target.requestAnimationFrame(drawBeatCursor);
+ render();
+}
 document.addEventListener('visibilitychange', render);
 window.addEventListener('focus', render);
 
-setMode('voksen');render();
-requestAnimationFrame(drawBeatCursor);
+setMode('voksen');
+runClockUpdates(window);
 })();

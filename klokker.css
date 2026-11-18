@@ -224,8 +224,13 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 
 /* Felles tidsvisning og redigerbare felt for klokkeverktÃ¸yene. */
-.display.time-card {
+.time-card, #pause {
   --clock-number-size: clamp(24px, calc(8.5vw * var(--text-scale, 1)), calc(36px * var(--text-scale, 1)));
+  --time-column: max(51px, calc(var(--clock-number-size) * 1.42));
+  --time-separator: calc(var(--clock-number-size) * .4);
+  --time-inset: calc(var(--clock-number-size) * .28 + 1px);
+}
+.display.time-card {
   padding: 14px;
 }
 .display .time-value {
@@ -280,13 +285,16 @@ body[data-theme="dag"] .display .time-value { color: inherit; }
 
 .display .adjustable-time {
   align-items: flex-start;
+  gap: 0;
   inline-size: auto;
 }
 .time-segment {
   display: grid;
   justify-items: center;
+  inline-size: var(--time-column);
   gap: 4px;
 }
+.display .adjustable-time > span { inline-size: var(--time-separator); text-align: center; }
 .time-segment input:not(:read-only) { box-shadow: none; }
 .time-steps { display: flex; gap: 3px; }
 .time-step {
@@ -312,3 +320,79 @@ body[data-theme="dag"] .display .time-value { color: inherit; }
 #breathTap { min-height: 52px; font-size: 1em; }
 
 .bottom-links { border-top: 1px solid var(--border); }
+
+/* En felles enhetsrad for hvert verktÃ¸y. */
+.time-unit-headings {
+  display: flex;
+  justify-content: center;
+  gap: var(--time-separator);
+  color: var(--muted);
+  font-size: calc(12px * var(--text-scale, 1));
+  font-weight: 700;
+  margin-block: 0 6px;
+}
+.time-unit-headings span {
+  inline-size: var(--time-column);
+  text-align: center;
+}
+.time-unit-headings-end {
+  align-self: flex-end;
+  justify-content: flex-end;
+  padding-inline-end: var(--time-inset);
+}
+#pause > .time-unit-headings { padding-inline-end: calc(15px + var(--time-inset)); }
+#stoppeklokke .time-unit-headings { gap: 0; }
+#stoppeklokke .time-unit-headings span { inline-size: max(49px, calc(var(--clock-number-size) * 1.5)); }
+#pause .time-segment input::placeholder { opacity: 1; }
+
+.floating-launch { min-height: 40px; padding-inline: 10px; }
+.floating-notice > p, #floatingError { color: var(--muted); }
+.floating-notice > .btn { padding-inline: 12px; }
+.floating-toggle[hidden], .floating-notice[hidden] { display: none; }
+
+body.floating-clocks {
+  background: var(--bg);
+  padding: 0;
+}
+.floating-clocks .tool {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  background: var(--bg);
+}
+.floating-clocks .tool > :is(.top, .settings-menu, .bottom-links, .copyright) { display: none; }
+.floating-clocks .tool > .tabs {
+  display: grid;
+  flex: 0 0 min(124px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  margin: 0;
+  padding: 4px;
+}
+.floating-clocks .tabs > .tab {
+  min-height: 56px;
+  border-radius: 7px;
+}
+.floating-clocks .tabs > .floating-toggle {
+  min-height: 35px;
+  font-size: 20px;
+}
+.floating-clocks .tool-panes {
+  flex: 1 1 0;
+  min-width: 0;
+  max-height: 100dvh;
+  overflow: auto;
+}
+.floating-clocks .tool-panes[hidden],
+.floating-clocks .tool-panes > .pane[hidden] { display: none !important; }
+.floating-clocks .tool-panes > .pane {
+  min-height: 0;
+  padding: 12px;
+}
