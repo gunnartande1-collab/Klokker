@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261119-3">
-    <script src="klokker.js?v=20261119-3" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261119-5">
+    <script src="klokker.js?v=20261119-5" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
@@ -84,6 +84,10 @@
                 aria-expanded="false" aria-controls="clockPanes" aria-label="Vis sist brukte verktøy" hidden>Utvid</button>
         </nav>
         <div class="tool-panes" id="clockPanes">
+            <header class="floating-pane-heading">
+                <h1>Operatørverktøy</h1>
+                <p id="floatingToolName"></p>
+            </header>
             <section class="pane" id="metronom" aria-label="Metronom" hidden inert>
                 <div class="display beat-display" id="beatDisplay">
                     <div id="bpmView" class="bpm-view">
@@ -252,7 +256,6 @@
                         </div>
                     </div>
                     <p id="pauseState" role="status"></p>
-                    <button class="btn pause-ack" id="pauseAck" type="button" hidden>Kvitter pausevarsel</button>
                 </div>
                 <div class="toggle-row">
                     <span>Lydvarsel når pausen starter?</span>
@@ -371,5 +374,3 @@
     </dialog>
 </body>
 </html>
-
-

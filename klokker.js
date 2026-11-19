@@ -32,10 +32,12 @@ const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{
 const modes={voksen:110,nyfodt:120};
 const tabs = [...tool.querySelectorAll('[data-tab]')];
 const panes = $('clockPanes');
+const toolPanels = [...panes.querySelectorAll('.pane')];
+const floatingToolName = $('floatingToolName');
 const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
-const floatingRailWidth = 232;
-const floatingPanelWidth = 370;
+const floatingRailWidth = 400;
+const floatingPanelWidth = 480;
 const floatingTime = $('floatingTime');
 const floatingDate = $('floatingDate');
 const osloTime = new Intl.DateTimeFormat('nb-NO', {
@@ -62,20 +64,33 @@ function tab(id) {
    button.classList.toggle('active', selected);
    button.setAttribute('aria-selected', String(selected));
  }
- for (const pane of panes.children) {
+ for (const pane of toolPanels) {
    pane.hidden = pane.id !== id;
    pane.inert = pane.hidden;
  }
  if (floatingWindow) {
    panes.hidden = !id;
+   tool.classList.toggle('floating-expanded', !!id);
+   floatingToolName.textContent = id ? $(id).getAttribute('aria-label') : '';
    toggleFloatingPane.textContent = id ? 'Kollaps' : 'Utvid';
    toggleFloatingPane.setAttribute('aria-expanded', String(!!id));
    toggleFloatingPane.setAttribute('aria-label', id ? 'Skjul verktøypanelet' : 'Vis sist brukte verktøy');
  }
 }
 
+function panelOpensToRight(popup) {
+ const {screenX, outerWidth, screen} = popup;
+ const {availLeft, availWidth} = screen;
+ if (!Number.isFinite(availLeft) || !Number.isFinite(availWidth) || !Number.isFinite(screenX) || availWidth <= 0) return false;
+ const railCenter = screenX + Math.min(outerWidth || floatingRailWidth, floatingRailWidth) / 2;
+ return railCenter < availLeft + availWidth / 2;
+}
+
 function toggleTool(id) {
  const wasOpen = !!activeTool;
+ if (floatingWindow && !wasOpen && id) {
+   tool.classList.toggle('floating-panel-right', panelOpensToRight(floatingWindow));
+ }
  tab(id);
  if (floatingWindow && wasOpen !== !!id) {
    const width = floatingRailWidth + (id ? floatingPanelWidth : 0);
@@ -87,7 +102,15 @@ function toggleTool(id) {
  }
 }
 for (const button of tabs) {
- button.addEventListener('click', () => toggleTool(floatingWindow && activeTool === button.dataset.tab ? null : button.dataset.tab));
+ button.addEventListener('click', () => {
+   const id = button.dataset.tab;
+   if (id === 'pause' && pendingPauseAlarms.size > 0) {
+     acknowledgePause();
+     toggleTool(id);
+     return;
+   }
+   toggleTool(floatingWindow && activeTool === id ? null : id);
+ });
 }
 toggleFloatingPane.addEventListener('click', () => toggleTool(activeTool ? null : lastTool));
 
@@ -111,10 +134,11 @@ floatingLaunch.addEventListener('click', async () => {
  floatingLaunch.disabled = true;
  if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
-   const popup = await window.documentPictureInPicture.requestWindow({width:floatingRailWidth, height:555});
+   const popup = await window.documentPictureInPicture.requestWindow({width:floatingRailWidth, height:940});
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
+     tool.classList.remove('floating-expanded', 'floating-panel-right');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
      toggleFloatingPane.hidden = true;
@@ -362,7 +386,6 @@ function clearCountAlert() {
  state.count.finished = false;
  state.count.lastAlarm = null;
  countBox.classList.remove('count-flash');
- countTab.classList.remove('count-flash');
  stopTones(countTones);
 }
 countInput.group.addEventListener('input', () => {
@@ -399,8 +422,7 @@ function finishCountdown() {
  countdown.remaining = 0;
  countdown.finished = true;
  countdown.lastAlarm = null;
- const target = $('nedtelling').hidden ? countTab : countBox;
- target.classList.add('count-flash');
+ if (!$('nedtelling').hidden) countBox.classList.add('count-flash');
 }
 $('countPause').addEventListener('click', () => {
  const countdown = state.count;
@@ -425,7 +447,9 @@ $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());rend
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
 const pauseSoundButtons = tool.querySelectorAll('[data-setting="pauseSound"] button');
 const pendingPauseAlarms = new Set();
-let lastPauseSound = null;
+const pauseSignalLimit = 3;
+let pauseAlarmStarted = null;
+let pauseSoundSlot = -1;
 
 async function unlockPauseAudio() {
  if (!state.options.pauseSound) return;
@@ -484,36 +508,43 @@ $('pauseSave').addEventListener('click', () => {
  unlockPauseAudio();
  render();
 });
-$('pauseAck').addEventListener('click', () => {
+function acknowledgePause() {
  pendingPauseAlarms.clear();
- lastPauseSound = null;
+ pauseAlarmStarted = null;
+ pauseSoundSlot = -1;
  stopTones(pauseTones);
  render();
-});
+}
 $('pauseReset').addEventListener('click', () => {
  $('pauseError').hidden = true;
  $('pauseSoundError').hidden = true;
  state.pauses = [];
- pendingPauseAlarms.clear();
- lastPauseSound = null;
- stopTones(pauseTones);
  for (const [, field] of pauseFields) field.write('');
- render();
+ acknowledgePause();
 });
 function renderPauses(now) {
  for (const pause of state.pauses) {
    if (pause.triggered || now < pause.time) continue;
    pause.triggered = true;
    pendingPauseAlarms.add(pause);
-   lastPauseSound = null;
+   if (pauseAlarmStarted === null || now - pauseAlarmStarted >= alertRepeat * pauseSignalLimit) {
+     pauseAlarmStarted = now;
+     pauseSoundSlot = -1;
+   }
+ }
+ if (pauseAlarmStarted !== null) {
+   const slot = Math.floor((now - pauseAlarmStarted) / alertRepeat);
+   if (slot >= pauseSignalLimit) {
+     pendingPauseAlarms.clear();
+     pauseAlarmStarted = null;
+     stopTones(pauseTones);
+   } else if (state.options.pauseSound && slot > pauseSoundSlot && playSignal(pauseSignal, pauseTones)) {
+     pauseSoundSlot = slot;
+   }
  }
  const due = pendingPauseAlarms.size > 0;
- if (due && state.options.pauseSound && (lastPauseSound === null || now - lastPauseSound >= alertRepeat)) {
-   if (playSignal(pauseSignal, pauseTones)) lastPauseSound = now;
- }
  $('pauseBox').classList.toggle('pause-due', due);
  tool.querySelector('[data-tab="pause"]').classList.toggle('pause-due', due);
- $('pauseAck').hidden = !due;
  for (const button of pauseSoundButtons) button.disabled = due && state.options.pauseSound;
  $('pauseBadge').hidden = !due;
  $('pauseBadge').textContent = due ? 'NÅ' : '';
@@ -707,4 +738,3 @@ window.addEventListener('focus', render);
 setMode('voksen');
 runClockUpdates(window);
 })();
-
