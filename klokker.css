@@ -492,3 +492,17 @@ body.floating-clocks {
   .floating-clocks .pane#pause > .actions { grid-row: 1; }
   .floating-clocks .pane#pause > p { grid-column: 1 / -1; }
 }
+
+@media (max-width: 620px) {
+  .floating-clocks .tool > .tabs {
+    grid-template-columns: minmax(87px, 1.2fr) repeat(6, minmax(48px, 1fr)) minmax(54px, .8fr);
+    column-gap: 2px;
+    padding-inline: 4px;
+  }
+  .floating-clocks .tabs > .tab {
+    padding-inline: 2px;
+    font-size: calc(11px * var(--text-scale, 1));
+  }
+  .floating-clocks .tab-symbol svg { width: 24px; height: 24px; }
+  .floating-clocks #floatingDate { font-size: 11px; }
+}

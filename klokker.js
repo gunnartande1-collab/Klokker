@@ -141,9 +141,23 @@ floatingLaunch.addEventListener('click', async () => {
      width: Math.min(720, Math.round(window.screen.availWidth * .9)),
      height: defaultStripHeight
    });
+   floatingWindow = popup;
+   const popupDocument = popup.document;
+   popupDocument.documentElement.lang = document.documentElement.lang;
+   popupDocument.title = 'OPSIX Klokkeverktøy';
+
+   const stylesheet = popupDocument.createElement('link');
+   stylesheet.rel = 'stylesheet';
+   stylesheet.href = clockStylesheet;
+   const stylesheetReady = new Promise((resolve, reject) => {
+     stylesheet.addEventListener('load', () => resolve(true), {once:true});
+     stylesheet.addEventListener('error', () => reject(new Error('Kunne ikke laste vindusstilen.')), {once:true});
+     popup.addEventListener('pagehide', () => resolve(false), {once:true});
+   });
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
+     if (tool.ownerDocument !== popupDocument) return;
      tool.classList.remove('floating-expanded', 'floating-panel-above');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
@@ -154,20 +168,17 @@ floatingLaunch.addEventListener('click', async () => {
      runClockUpdates(window);
      floatingLaunch.focus();
    }, {once:true});
-   floatingWindow = popup;
-   popup.document.documentElement.lang = document.documentElement.lang;
-   popup.document.title = 'OPSIX Klokkeverktøy';
-   const stylesheet = popup.document.createElement('link');
-   stylesheet.rel = 'stylesheet';
-   stylesheet.href = clockStylesheet;
-   popup.document.head.append(stylesheet);
-   popup.document.body.classList.add('floating-clocks');
+   popupDocument.head.append(stylesheet);
+   if (!(await stylesheetReady) || popup.closed || floatingWindow !== popup) return;
+
+   popupDocument.body.classList.add('floating-clocks');
    syncFloatingAppearance();
-   popup.document.body.append(tool);
-   floatingNotice.hidden = false;
+   tab(null);
    toggleFloatingPane.hidden = false;
    $('floatingClock').hidden = false;
-   tab(null);
+   renderFloatingClock(Date.now());
+   popupDocument.body.append(tool);
+   floatingNotice.hidden = false;
    runClockUpdates(popup);
    tabs[0].focus();
  } catch {
