@@ -13,16 +13,20 @@ function getAudio(resume = true){try{audio ||= new (window.AudioContext||window.
 function tone(time,frequency=800,duration=.08,volume=.12,type='sine'){
  const a=getAudio();if(!a)return;try{const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.value=frequency;g.gain.setValueAtTime(.0001,time);g.gain.exponentialRampToValueAtTime(volume,time+.009);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g).connect(a.destination);o.start(time);o.stop(time+duration+.02);return o}catch{}
 }
-const pauseNotes = [[0,523],[.20,659],[.40,784]];
+const alertRepeat = 8000;
 const countTones = new Set();
-function alarm() {
- const context = getAudio();
- if (!context || context.state !== 'running') return;
- for (const repeat of [0, 1.25]) {
-   for (const delay of [0, .26, .52]) {
-     trackTone(countTones, tone(context.currentTime + .02 + repeat + delay, 840, .15, .23, 'triangle'));
-   }
+const pauseTones = new Set();
+const countdownSignal = [[0,840,.17,.23],[.26,840,.17,.23]];
+const pauseSignal = [[0,740,.25,.34],[.33,988,.30,.36],[.72,740,.25,.34]];
+function playSignal(notes, tones) {
+ const context = getAudio(false);
+ if (!context || context.state !== 'running') return false;
+ stopTones(tones);
+ const start = context.currentTime + .02;
+ for (const [delay, frequency, duration, gain] of notes) {
+   trackTone(tones, tone(start + delay, frequency, duration, gain, 'triangle'));
  }
+ return true;
 }
 const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,pauseSound:true},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const modes={voksen:110,nyfodt:120};
@@ -30,6 +34,23 @@ const tabs = [...tool.querySelectorAll('[data-tab]')];
 const panes = $('clockPanes');
 const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
+const floatingRailWidth = 232;
+const floatingPanelWidth = 370;
+const floatingTime = $('floatingTime');
+const floatingDate = $('floatingDate');
+const osloTime = new Intl.DateTimeFormat('nb-NO', {
+ timeZone:'Europe/Oslo', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'
+});
+const osloDate = new Intl.DateTimeFormat('nb-NO', {
+ timeZone:'Europe/Oslo', day:'numeric', month:'long', year:'numeric'
+});
+let displayedSecond;
+function renderFloatingClock(now) {
+ if (!floatingWindow || Math.floor(now / 1000) === displayedSecond) return;
+ displayedSecond = Math.floor(now / 1000);
+ floatingTime.textContent = osloTime.format(now).replace(/\./g, ':');
+ floatingDate.textContent = osloDate.format(now);
+}
 let lastTool = tabs.find(button => button.classList.contains('active')).dataset.tab;
 let activeTool = lastTool;
 
@@ -47,7 +68,7 @@ function tab(id) {
  }
  if (floatingWindow) {
    panes.hidden = !id;
-   toggleFloatingPane.textContent = id ? '→' : '←';
+   toggleFloatingPane.textContent = id ? 'Kollaps' : 'Utvid';
    toggleFloatingPane.setAttribute('aria-expanded', String(!!id));
    toggleFloatingPane.setAttribute('aria-label', id ? 'Skjul verktøypanelet' : 'Vis sist brukte verktøy');
  }
@@ -57,9 +78,7 @@ function toggleTool(id) {
  const wasOpen = !!activeTool;
  tab(id);
  if (floatingWindow && wasOpen !== !!id) {
-   const collapsedWidth = 124;
-   const expandedWidth = 510;
-   const width = id ? expandedWidth : collapsedWidth;
+   const width = floatingRailWidth + (id ? floatingPanelWidth : 0);
    try {
      floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
    } catch {
@@ -90,14 +109,16 @@ floatingLaunch.addEventListener('click', async () => {
  }
  if (floatingWindow) return;
  floatingLaunch.disabled = true;
+ if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
-   const popup = await window.documentPictureInPicture.requestWindow({width:124, height:520});
+   const popup = await window.documentPictureInPicture.requestWindow({width:floatingRailWidth, height:555});
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
      toggleFloatingPane.hidden = true;
+     $('floatingClock').hidden = true;
      floatingNotice.hidden = true;
      tab(lastTool);
      runClockUpdates(window);
@@ -115,6 +136,7 @@ floatingLaunch.addEventListener('click', async () => {
    popup.document.body.append(tool);
    floatingNotice.hidden = false;
    toggleFloatingPane.hidden = false;
+   $('floatingClock').hidden = false;
    tab(null);
    runClockUpdates(popup);
    tabs[0].focus();
@@ -315,6 +337,7 @@ const countInput = timeParts('countDisplay');
 const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
 const countBox = $('countBox');
+const countSoundButtons = tool.querySelectorAll('[data-setting="countSound"] button');
 for (const group of document.querySelectorAll('.adjustable-time')) {
  group.addEventListener('click', event => {
    const button = event.target.closest('[data-step]');
@@ -337,12 +360,13 @@ function formatCountdown(ms) {
 }
 function clearCountAlert() {
  state.count.finished = false;
+ state.count.lastAlarm = null;
  countBox.classList.remove('count-flash');
  countTab.classList.remove('count-flash');
  stopTones(countTones);
 }
 countInput.group.addEventListener('input', () => {
- if (state.count.running) return;
+ if (state.count.running || state.count.finished) return;
  clearCountAlert();
  state.count.edited = true;
  $('countError').hidden = true;
@@ -353,15 +377,13 @@ countInput.group.addEventListener('keydown', event => {
 });
 $('countStart').addEventListener('click', () => {
  const countdown = state.count;
- if (countdown.running) return;
+ if (countdown.running || countdown.finished) return;
  if (countdown.edited) {
    const parts = countInput.read();
    $('countError').hidden = !!parts;
    if (!parts) return;
    countdown.initial = countdown.remaining = durationMs(parts);
    countdown.edited = false;
- } else if (countdown.finished) {
-   countdown.remaining = countdown.initial;
  }
  if (!countdown.remaining) return;
  clearCountAlert();
@@ -376,7 +398,7 @@ function finishCountdown() {
  countdown.running = false;
  countdown.remaining = 0;
  countdown.finished = true;
- if (state.options.countSound) alarm();
+ countdown.lastAlarm = null;
  const target = $('nedtelling').hidden ? countTab : countBox;
  target.classList.add('count-flash');
 }
@@ -397,93 +419,106 @@ $('countReset').addEventListener('click', () => {
  $('countError').hidden = true;
  render();
 });
-for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){cancelPauseAudio();schedulePauseAudio()}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
+for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){if(state.options.pauseSound) unlockPauseAudio();else stopTones(pauseTones)}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
 $('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
-for (const [, field] of pauseFields) field.group.addEventListener('input', () => { $('pauseError').hidden = true; });
-const pauseAlertDuration = 5 * 60 * 1000;
-const pauseTones = new Set();
-let pauseAudioRevision = 0;
-function cancelPauseAudio() {
- pauseAudioRevision++;
- for (const pause of state.pauses) {
-   if (pause.soundStart !== null && audio.currentTime >= pause.soundStart) pause.played = true;
-   pause.soundStart = null;
- }
- stopTones(pauseTones);
-}
+const pauseSoundButtons = tool.querySelectorAll('[data-setting="pauseSound"] button');
+const pendingPauseAlarms = new Set();
+let lastPauseSound = null;
 
-async function schedulePauseAudio() {
- const error = $('pauseSoundError');
- error.hidden = true;
- if (!state.options.pauseSound || !state.pauses.some(pause => !pause.played)) return;
- const revision = pauseAudioRevision;
+async function unlockPauseAudio() {
+ if (!state.options.pauseSound) return;
  const context = getAudio(false);
  try {
    if (context && context.state !== 'running') await context.resume();
- } catch {
-   // The visual reminder works even when the browser blocks sound.
- }
- if (revision !== pauseAudioRevision) return;
- if (!context || context.state !== 'running') {
-   error.hidden = false;
-   return;
- }
- const now = Date.now();
- for (const pause of state.pauses) {
-   if (pause.played || now >= pause.time + pauseAlertDuration) continue;
-   const start = context.currentTime + Math.max(.03, (pause.time - now) / 1000);
-   pause.soundStart = start;
-   for (const [delay, frequency] of pauseNotes) {
-     trackTone(pauseTones, tone(start + delay, frequency, .23, .24));
-   }
- }
+ } catch {}
+ $('pauseSoundError').hidden = context?.state === 'running' || !state.options.pauseSound;
 }
+
+function savePause(type, field, parts, now) {
+ const [hours, minutes] = parts;
+ const date = new Date(now);
+ date.setHours(hours, minutes, 0, 0);
+ if (date.getTime() + 60000 <= now) date.setDate(date.getDate() + 1);
+ const time = date.getTime();
+ const previous = state.pauses.find(pause => pause.field === field);
+ if (previous?.time === time) return;
+ const label = fmt2(hours) + ':' + fmt2(minutes);
+ state.pauses = state.pauses.filter(pause => pause.field !== field);
+ state.pauses.push({type, field, time, label, triggered:false});
+}
+
+for (const [type, field] of pauseFields) {
+ field.group.addEventListener('input', () => {
+   $('pauseError').hidden = true;
+   if (!/^\d{2}:\d{2}$/.test(field.value())) return;
+   const parts = field.read({requireAll:true, silent:true});
+   if (!parts) return;
+   unlockPauseAudio();
+   savePause(type, field, parts, Date.now());
+   render();
+ });
+}
+
 $('pauseSave').addEventListener('click', () => {
  const now = Date.now();
- const pauses = [];
+ const entries = [];
  for (const [type, field] of pauseFields) {
-   if (field.value() === ':') continue;
-   const time = field.read({requireAll:true});
-   if (!time) {
+   const parts = field.value() === ':' ? [] : field.read({requireAll:true});
+   if (!parts) {
      $('pauseError').hidden = false;
      return;
    }
-   const [hours, minutes] = time;
-   const label = fmt2(hours) + ':' + fmt2(minutes);
-   field.write(label);
-   const date = new Date(now);
-   date.setHours(hours, minutes, 0, 0);
-   if (date.getTime() + 60000 <= now) date.setDate(date.getDate() + 1);
-   const timeMs = date.getTime();
-   const existing = state.pauses.find(pause => pause.field === field && pause.time === timeMs);
-   pauses.push(existing ?? {type, field, time:timeMs, label, played:false, soundStart:null});
+   entries.push([type, field, parts]);
+ }
+ for (const [type, field, parts] of entries) {
+   if (parts.length) {
+     field.write(parts.map(fmt2).join(':'));
+     savePause(type, field, parts, now);
+   } else {
+     state.pauses = state.pauses.filter(pause => pause.field !== field);
+   }
  }
  $('pauseError').hidden = true;
- cancelPauseAudio();
- state.pauses = pauses;
- schedulePauseAudio();
+ unlockPauseAudio();
+ render();
+});
+$('pauseAck').addEventListener('click', () => {
+ pendingPauseAlarms.clear();
+ lastPauseSound = null;
+ stopTones(pauseTones);
  render();
 });
 $('pauseReset').addEventListener('click', () => {
  $('pauseError').hidden = true;
- cancelPauseAudio();
- state.pauses = [];
  $('pauseSoundError').hidden = true;
+ state.pauses = [];
+ pendingPauseAlarms.clear();
+ lastPauseSound = null;
+ stopTones(pauseTones);
  for (const [, field] of pauseFields) field.write('');
  render();
 });
 function renderPauses(now) {
- const due = state.pauses.filter(pause => now >= pause.time && now < pause.time + pauseAlertDuration);
- for (const [, field] of pauseFields) {
-   field.group.closest('.pause-time-row').classList.toggle('due', due.some(pause => pause.field === field));
+ for (const pause of state.pauses) {
+   if (pause.triggered || now < pause.time) continue;
+   pause.triggered = true;
+   pendingPauseAlarms.add(pause);
+   lastPauseSound = null;
  }
- tool.querySelector('[data-tab="pause"]').classList.toggle('pause-due', !!due.length);
- $('pauseBadge').hidden = !due.length;
- $('pauseBadge').textContent = due.length ? 'NÅ' : '';
+ const due = pendingPauseAlarms.size > 0;
+ if (due && state.options.pauseSound && (lastPauseSound === null || now - lastPauseSound >= alertRepeat)) {
+   if (playSignal(pauseSignal, pauseTones)) lastPauseSound = now;
+ }
+ $('pauseBox').classList.toggle('pause-due', due);
+ tool.querySelector('[data-tab="pause"]').classList.toggle('pause-due', due);
+ $('pauseAck').hidden = !due;
+ for (const button of pauseSoundButtons) button.disabled = due && state.options.pauseSound;
+ $('pauseBadge').hidden = !due;
+ $('pauseBadge').textContent = due ? 'NÅ' : '';
  const next = state.pauses.filter(pause => pause.time > now).sort((a,b) => a.time-b.time)[0];
- const message = due.length ? due.map(pause => pause.type).join(' + ') + ' nå'
+ const message = due ? [...new Set([...pendingPauseAlarms].map(pause => pause.type))].join(' + ') + ' nå'
    : next ? 'Neste: ' + next.type + ' kl. ' + next.label : '';
  if ($('pauseState').textContent !== message) $('pauseState').textContent = message;
 }
@@ -491,42 +526,16 @@ function renderPauses(now) {
 const defaultLandingDuration = 180000;
 const defaultLandingWarning = 90000;
 const landingDuration = timeParts('heliDuration');
-const landingEta = timeParts('heliEta');
 const landingWarning = timeParts('heliWarning');
-let etaIsSource = false;
-let previewEta = null;
-
-function formatClockTime(ms) {
- const date = new Date(ms);
- return [date.getHours(), date.getMinutes(), date.getSeconds()].map(fmt2).join(':');
-}
-
-function nextEta(parts, now) {
- const date = new Date(now);
- date.setHours(...parts, 0);
- if (date.getTime() <= now) date.setDate(date.getDate() + 1);
- return date.getTime();
-}
-
-for (const entry of [landingDuration, landingEta, landingWarning]) {
+for (const entry of [landingDuration, landingWarning]) {
  entry.group.addEventListener('input', () => {
    setLandingError('');
-   if (entry === landingDuration || entry === landingEta) {
-     etaIsSource = entry === landingEta;
-     const now = Date.now();
-     const parts = entry.read({requireAll:etaIsSource, silent:true});
-     if (!parts) previewEta = null;
-     else if (etaIsSource) previewEta = nextEta(parts, now);
-     else {
-       const duration = durationMs(parts);
-       previewEta = duration > 0 ? now + duration : null;
-     }
-   }
    render();
  });
- entry.group.addEventListener('keydown', event => { if (event.key === 'Enter' && event.target.matches('input')) $('heliStart').click(); });
+ entry.group.addEventListener('keydown', event => {
+   if (event.key === 'Enter' && event.target.matches('input')) $('heliStart').click();
+ });
 }
-const landingRepeat = 8000;
 const landingTones = new Set();
 const heliTab = document.querySelector('[data-tab="helikopter"]');
 async function playLandingSound() {
@@ -559,31 +568,27 @@ function setLandingError(message) {
 }
 $('heliStart').addEventListener('click', () => {
  if (state.heli.start !== null) return;
- const now = Date.now();
- const sourceParts = etaIsSource ? landingEta.read({requireAll:true}) : landingDuration.read();
+ const sourceParts = landingDuration.read();
  const warningParts = sourceParts && landingWarning.read();
  if (!sourceParts || !warningParts) {
    setLandingError('Kontroller timer, minutter og sekunder.');
    return;
  }
- const eta = previewEta ?? (etaIsSource ? nextEta(sourceParts, now) : now + durationMs(sourceParts));
- const duration = eta - now;
+ const duration = durationMs(sourceParts);
  if (duration <= 0) {
-   setLandingError('Angi en forventet landing fram i tid.');
+   setLandingError('Angi tid igjen til landing.');
    return;
  }
  const warning = durationMs(warningParts);
  getAudio();
  setLandingError('');
- Object.assign(state.heli, {start:performance.now(), duration, warning, eta});
+ Object.assign(state.heli, {start:performance.now(), duration, warning});
  landingWarning.write(formatCountdown(warning));
  render();
 });
 $('heliReset').addEventListener('click', () => {
  stopLandingSound();
  Object.assign(state.heli, {start:null, lastAlarm:null, acknowledged:false});
- etaIsSource = false;
- previewEta = null;
  landingDuration.write(formatCountdown(defaultLandingDuration));
  landingWarning.write(formatCountdown(defaultLandingWarning));
  setLandingError('');
@@ -594,14 +599,14 @@ $('heliAck').addEventListener('click', () => {
  stopLandingSound();
  render();
 });
-function renderLanding(wallTime) {
+function renderLanding() {
  const heli = state.heli;
  const active = heli.start !== null;
  const now = performance.now();
  const elapsed = active ? now - heli.start : 0;
  const ms = (active ? heli.duration : defaultLandingDuration) - elapsed;
  const alert = active && ms <= heli.warning && !heli.acknowledged;
- if (alert && (heli.lastAlarm === null || now - heli.lastAlarm >= landingRepeat)) {
+ if (alert && (heli.lastAlarm === null || now - heli.lastAlarm >= alertRepeat)) {
    heli.lastAlarm = now;
    playLandingSound();
  }
@@ -609,19 +614,9 @@ function renderLanding(wallTime) {
  $('heliTime').textContent = time;
  $('heliTime').hidden = !active;
  landingDuration.group.hidden = active;
- landingEta.readOnly(active);
  landingWarning.readOnly(active);
  const durationParts = landingDuration.read({silent:true});
- const eta = active ? heli.eta : previewEta;
- if (!etaIsSource || active) landingEta.write(eta === null ? '00:00:00' : formatClockTime(eta));
- if (!active && !landingDuration.group.contains(tool.ownerDocument.activeElement)) {
-   if (eta !== null) landingDuration.write(formatCountdown(Math.max(0, eta - wallTime)));
-   else if (etaIsSource) landingDuration.write('00:00:00');
- }
- $('heliEtaDay').hidden = eta === null || new Date(eta).toDateString() === new Date(wallTime).toDateString();
- const previewDuration = eta === null ? (durationParts ? durationMs(durationParts) : defaultLandingDuration)
-   : Math.max(0, eta - wallTime);
- const timelineDuration = active ? heli.duration : previewDuration;
+ const timelineDuration = active ? heli.duration : durationParts ? durationMs(durationParts) : defaultLandingDuration;
  const warningParts = landingWarning.read({silent:true});
  const warningLead = active ? heli.warning : warningParts ? durationMs(warningParts) : defaultLandingWarning;
  const warningPosition = timelineDuration > 0
@@ -656,7 +651,7 @@ function updateActiveClockIndicator(now) {
  const pausedCountdown = count.paused && count.remaining > 0;
  const hasPendingPause = pauses.some(pause => pause.time > now);
  const hasActiveClock = heli.start !== null || metro.running || count.running ||
-   pausedCountdown || stop.running || stop.elapsed > 0 || hasPendingPause;
+   pausedCountdown || count.finished || stop.running || stop.elapsed > 0 || hasPendingPause || pendingPauseAlarms.size > 0;
  document.documentElement.toggleAttribute('data-opsix-active-clock', hasActiveClock);
 }
 
@@ -664,7 +659,10 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if (c.running && remaining() <= 0) finishCountdown();
  const displayedTime = formatCountdown(remaining());
  if (!c.edited && countInput.value() !== displayedTime) countInput.write(displayedTime);
- countInput.readOnly(c.running);
+ countInput.readOnly(c.running || c.finished);
+ if (c.finished && state.options.countSound && (c.lastAlarm === null || now - c.lastAlarm >= alertRepeat)) {
+   if (playSignal(countdownSignal, countTones)) c.lastAlarm = now;
+ }
  const countMessage = c.running ? 'Nedtelling pågår' : c.paused ? 'Pauset' : '';
  $('countState').textContent = countMessage;
  $('countState').hidden = !countMessage;
@@ -672,7 +670,7 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
  const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);
- for(const [start,pause,running] of [['metroStart','metroPause',m.running],['countStart','countPause',c.running],['stopStart','stopPause',s.running]]){$(start).disabled=running;$(pause).disabled=!running}
+ for(const [start,pause,running] of [['metroStart','metroPause',m.running],['stopStart','stopPause',s.running]]){$(start).disabled=running;$(pause).disabled=!running}
  $('countBadge').hidden=!c.running;$('countBadge').textContent=c.running?displayedTime:'';$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
  $('breathUndo').disabled = !state.breaths.length;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
@@ -682,7 +680,11 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('breathBox').classList.toggle('observed', age >= 60000);
  renderPauses(now);
  updateActiveClockIndicator(now);
- const landingTime = renderLanding(now);
+ $('countStart').disabled = c.running || c.finished;
+ $('countPause').disabled = !c.running;
+ for (const button of countSoundButtons) button.disabled = c.finished && state.options.countSound;
+ renderFloatingClock(now);
+ const landingTime = renderLanding();
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
    : c.finished ? 'Ferdig | Nedtelling'
    : landingTime ? landingTime + ' | Landingsvarsel RH' : baseTitle;
