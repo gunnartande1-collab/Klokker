@@ -33,18 +33,12 @@ const modes={voksen:110,nyfodt:120};
 const tabs = [...tool.querySelectorAll('[data-tab]')];
 const panes = $('clockPanes');
 const toolPanels = [...panes.querySelectorAll('.pane')];
-const floatingPaneHeading = $('floatingPaneHeading');
-const floatingToolName = $('floatingToolName');
 const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
-const floatingRailWidth = 400;
-const floatingPanelWidth = 360;
-let collapsedFloatingWidth = floatingRailWidth;
-let collapsedFloatingHeight = 120;
+const defaultStripHeight = 80;
+const maximumPanelHeight = 230;
+let collapsedFloatingHeight = defaultStripHeight;
 
-function initialFloatingHeight(availableHeight) {
- return Math.max(440, Math.min(700, Math.round(availableHeight * .65)));
-}
 const floatingTime = $('floatingTime');
 const floatingDate = $('floatingDate');
 const osloTime = new Intl.DateTimeFormat('nb-NO', {
@@ -78,20 +72,10 @@ function tab(id) {
  if (floatingWindow) {
    panes.hidden = !id;
    tool.classList.toggle('floating-expanded', !!id);
-   floatingToolName.textContent = id ? $(id).getAttribute('aria-label') : '';
    toggleFloatingPane.textContent = id ? 'Kollaps' : 'Utvid';
    toggleFloatingPane.setAttribute('aria-expanded', String(!!id));
    toggleFloatingPane.setAttribute('aria-label', id ? 'Skjul verktøypanelet' : 'Vis sist brukte verktøy');
  }
-}
-
-function updateFloatingOrientation(popup) {
- if (floatingWindow !== popup || activeTool) return;
- const {innerWidth: width, innerHeight: height} = popup;
- if (width <= 0 || height <= 0) return;
- const horizontal = tool.classList.contains('floating-horizontal');
- // A small buffer around square keeps the strip from flipping back and forth.
- tool.classList.toggle('floating-horizontal', horizontal ? width > height : width >= height * 1.25);
 }
 
 function panelOpensAbove(popup) {
@@ -104,28 +88,18 @@ function panelOpensAbove(popup) {
 
 function toggleTool(id) {
  const wasOpen = !!activeTool;
- const horizontal = tool.classList.contains('floating-horizontal');
  if (floatingWindow && !wasOpen && id) {
-   if (horizontal) {
-     collapsedFloatingHeight = floatingWindow.innerHeight;
-     tool.classList.toggle('floating-panel-above', panelOpensAbove(floatingWindow));
-   } else {
-     collapsedFloatingWidth = floatingWindow.innerWidth;
-     tool.style.setProperty('--floating-strip-width', collapsedFloatingWidth + 'px');
-   }
+   collapsedFloatingHeight = floatingWindow.innerHeight;
+   tool.classList.toggle('floating-panel-above', panelOpensAbove(floatingWindow));
  }
  tab(id);
  if (!floatingWindow || (!id && !wasOpen)) return;
+ const availableHeight = floatingWindow.screen.availHeight;
+ const limit = Math.min(maximumPanelHeight, Math.floor((availableHeight || 900) / 3));
+ const panelHeight = id ? Math.min($(id).offsetHeight + 2, limit) : 0;
+ const difference = collapsedFloatingHeight + panelHeight - floatingWindow.innerHeight;
  try {
-   if (horizontal) {
-     const panelHeight = id ? floatingPaneHeading.offsetHeight + $(id).offsetHeight + 2 : 0;
-     const height = collapsedFloatingHeight + panelHeight;
-     const difference = height - floatingWindow.innerHeight;
-     if (difference) floatingWindow.resizeBy(0, difference);
-   } else if (wasOpen !== !!id) {
-     const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
-     floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
-   }
+   if (difference) floatingWindow.resizeBy(0, difference);
  } catch {
    // The browser can limit resizing. The window can still be resized manually.
  }
@@ -164,14 +138,13 @@ floatingLaunch.addEventListener('click', async () => {
  if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
    const popup = await window.documentPictureInPicture.requestWindow({
-     width: floatingRailWidth,
-     height: initialFloatingHeight(window.screen.availHeight)
+     width: Math.min(720, Math.round(window.screen.availWidth * .9)),
+     height: defaultStripHeight
    });
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
-     tool.classList.remove('floating-expanded', 'floating-horizontal', 'floating-panel-above');
-     tool.style.removeProperty('--floating-strip-width');
+     tool.classList.remove('floating-expanded', 'floating-panel-above');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
      toggleFloatingPane.hidden = true;
@@ -182,7 +155,6 @@ floatingLaunch.addEventListener('click', async () => {
      floatingLaunch.focus();
    }, {once:true});
    floatingWindow = popup;
-   popup.addEventListener('resize', () => updateFloatingOrientation(popup));
    popup.document.documentElement.lang = document.documentElement.lang;
    popup.document.title = 'OPSIX Klokkeverktøy';
    const stylesheet = popup.document.createElement('link');
@@ -196,7 +168,6 @@ floatingLaunch.addEventListener('click', async () => {
    toggleFloatingPane.hidden = false;
    $('floatingClock').hidden = false;
    tab(null);
-   updateFloatingOrientation(popup);
    runClockUpdates(popup);
    tabs[0].focus();
  } catch {
