@@ -38,7 +38,10 @@ const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
 const floatingRailWidth = 400;
 const floatingPanelWidth = 480;
+const floatingPanelHeight = 440;
+const floatingLayout = $('floatingLayout');
 let collapsedFloatingWidth = floatingRailWidth;
+let collapsedFloatingHeight = 120;
 
 function initialFloatingHeight(availableHeight) {
  return Math.max(440, Math.min(700, Math.round(availableHeight * .65)));
@@ -83,49 +86,38 @@ function tab(id) {
  }
 }
 
-function panelOpensToRight(popup) {
- const {screenX, outerWidth, screen} = popup;
- const {availLeft, availWidth} = screen;
- if (!Number.isFinite(availLeft) || !Number.isFinite(availWidth) || !Number.isFinite(screenX) || availWidth <= 0) return false;
- const railCenter = screenX + (outerWidth || floatingRailWidth) / 2;
- return railCenter < availLeft + availWidth / 2;
+function panelOpensAbove(popup) {
+ const {screenY, outerHeight, screen} = popup;
+ const {availTop, availHeight} = screen;
+ if (![screenY, availTop, availHeight].every(Number.isFinite) || availHeight <= 0) return false;
+ const railCenter = screenY + (outerHeight || popup.innerHeight) / 2;
+ return railCenter > availTop + availHeight / 2;
 }
 
 function toggleTool(id) {
  const wasOpen = !!activeTool;
+ const horizontal = tool.classList.contains('floating-horizontal');
  if (floatingWindow && !wasOpen && id) {
-   collapsedFloatingWidth = floatingWindow.innerWidth;
-   tool.style.setProperty('--floating-strip-width', collapsedFloatingWidth + 'px');
-   tool.classList.toggle('floating-panel-right', panelOpensToRight(floatingWindow));
+   if (horizontal) {
+     collapsedFloatingHeight = floatingWindow.innerHeight;
+     tool.classList.toggle('floating-panel-above', panelOpensAbove(floatingWindow));
+   } else {
+     collapsedFloatingWidth = floatingWindow.innerWidth;
+     tool.style.setProperty('--floating-strip-width', collapsedFloatingWidth + 'px');
+   }
  }
  tab(id);
  if (floatingWindow && wasOpen !== !!id) {
-   const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
-
    try {
-     console.log('--- OPSIX RESIZE TEST ---');
-     console.log('Before resize', {
-       screenX: floatingWindow.screenX,
-       screenY: floatingWindow.screenY,
-       outerWidth: floatingWindow.outerWidth,
-       innerWidth: floatingWindow.innerWidth
-     });
-
-     floatingWindow.resizeTo(
-       width,
-       floatingWindow.outerHeight || floatingWindow.innerHeight
-     );
-
-     setTimeout(() => {
-       console.log('After resize', {
-         screenX: floatingWindow.screenX,
-         screenY: floatingWindow.screenY,
-         outerWidth: floatingWindow.outerWidth,
-         innerWidth: floatingWindow.innerWidth
-       });
-     }, 100);
-   } catch (error) {
-     console.error('Resize failed', error);
+     if (horizontal) {
+       const height = collapsedFloatingHeight + (id ? floatingPanelHeight : 0);
+       floatingWindow.resizeBy(0, height - floatingWindow.innerHeight);
+     } else {
+       const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
+       floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
+     }
+   } catch {
+     // The browser can limit resizing. The window can still be resized manually.
    }
  }
 }
@@ -162,14 +154,15 @@ floatingLaunch.addEventListener('click', async () => {
  floatingLaunch.disabled = true;
  if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
+   const horizontal = floatingLayout.value === 'horizontal';
    const popup = await window.documentPictureInPicture.requestWindow({
-     width: floatingRailWidth,
-     height: initialFloatingHeight(window.screen.availHeight)
+     width: horizontal ? Math.min(1080, Math.round(window.screen.availWidth * .9)) : floatingRailWidth,
+     height: horizontal ? 120 : initialFloatingHeight(window.screen.availHeight)
    });
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
-     tool.classList.remove('floating-expanded', 'floating-panel-right');
+     tool.classList.remove('floating-expanded', 'floating-horizontal', 'floating-panel-above');
      tool.style.removeProperty('--floating-strip-width');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
@@ -181,24 +174,7 @@ floatingLaunch.addEventListener('click', async () => {
      floatingLaunch.focus();
    }, {once:true});
    floatingWindow = popup;
-
-   console.log('PiP properties', {
-     moveTo: typeof popup.moveTo,
-     moveBy: typeof popup.moveBy,
-     screenX: popup.screenX,
-     screenY: popup.screenY,
-     outerWidth: popup.outerWidth,
-     outerHeight: popup.outerHeight
-   });
-
-   popup.addEventListener('resize', () => {
-     console.log('PiP resize event', {
-       screenX: popup.screenX,
-       screenY: popup.screenY,
-       outerWidth: popup.outerWidth,
-       innerWidth: popup.innerWidth
-     });
-   });
+   tool.classList.toggle('floating-horizontal', horizontal);
    popup.document.documentElement.lang = document.documentElement.lang;
    popup.document.title = 'OPSIX Klokkeverktøy';
    const stylesheet = popup.document.createElement('link');

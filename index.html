@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261119-8">
-    <script src="klokker.js?v=20261119-9" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261119-12">
+    <script src="klokker.js?v=20261119-12" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
@@ -20,6 +20,13 @@
                 <strong>Støtteverktøy</strong>
             </div>
             <div class="header-actions">
+                <label class="floating-layout-choice">
+                    Flytende visning
+                    <select id="floatingLayout">
+                        <option value="vertical">Loddrett</option>
+                        <option value="horizontal">Vannrett</option>
+                    </select>
+                </label>
                 <button class="btn floating-launch" id="openFloating" type="button">Åpne flytende verktøy</button>
                 <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">↗</button>
                 <button id="settingsToggle" class="icon-button" type="button" title="Innstillinger" aria-label="Innstillinger" aria-expanded="false" aria-controls="clockSettings">⚙</button>
