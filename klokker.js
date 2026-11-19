@@ -101,10 +101,31 @@ function toggleTool(id) {
  tab(id);
  if (floatingWindow && wasOpen !== !!id) {
    const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
+
    try {
-     floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
-   } catch {
-     // The browser can limit resizing. The window can still be resized manually.
+     console.log('--- OPSIX RESIZE TEST ---');
+     console.log('Before resize', {
+       screenX: floatingWindow.screenX,
+       screenY: floatingWindow.screenY,
+       outerWidth: floatingWindow.outerWidth,
+       innerWidth: floatingWindow.innerWidth
+     });
+
+     floatingWindow.resizeTo(
+       width,
+       floatingWindow.outerHeight || floatingWindow.innerHeight
+     );
+
+     setTimeout(() => {
+       console.log('After resize', {
+         screenX: floatingWindow.screenX,
+         screenY: floatingWindow.screenY,
+         outerWidth: floatingWindow.outerWidth,
+         innerWidth: floatingWindow.innerWidth
+       });
+     }, 100);
+   } catch (error) {
+     console.error('Resize failed', error);
    }
  }
 }
@@ -160,6 +181,15 @@ floatingLaunch.addEventListener('click', async () => {
      floatingLaunch.focus();
    }, {once:true});
    floatingWindow = popup;
+
+   popup.addEventListener('resize', () => {
+     console.log('PiP resize event', {
+       screenX: popup.screenX,
+       screenY: popup.screenY,
+       outerWidth: popup.outerWidth,
+       innerWidth: popup.innerWidth
+     });
+   });
    popup.document.documentElement.lang = document.documentElement.lang;
    popup.document.title = 'OPSIX Klokkeverktøy';
    const stylesheet = popup.document.createElement('link');
