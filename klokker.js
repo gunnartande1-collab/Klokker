@@ -36,6 +36,9 @@ const toolPanels = [...panes.querySelectorAll('.pane')];
 const floatingToolName = $('floatingToolName');
 const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
+let floatingIsPictureInPicture = false;
+let collapsedBounds = null;
+let floatingLayoutRevision = 0;
 const floatingRailWidth = 400;
 const floatingPanelWidth = 480;
 const floatingTime = $('floatingTime');
@@ -78,28 +81,85 @@ function tab(id) {
  }
 }
 
-function panelOpensToRight(popup) {
- const {screenX, outerWidth, screen} = popup;
- const {availLeft, availWidth} = screen;
- if (!Number.isFinite(availLeft) || !Number.isFinite(availWidth) || !Number.isFinite(screenX) || availWidth <= 0) return false;
- const railCenter = screenX + Math.min(outerWidth || floatingRailWidth, floatingRailWidth) / 2;
- return railCenter < availLeft + availWidth / 2;
+function getFloatingBounds(popup) {
+ return {
+   x: popup.screenX,
+   y: popup.screenY,
+   width: popup.outerWidth,
+   height: popup.outerHeight,
+   innerWidth: popup.innerWidth
+ };
+}
+
+function resizeFloatingLayout(popup, opening, panelToRight) {
+ const bounds = collapsedBounds;
+ const revision = ++floatingLayoutRevision;
+ const screen = popup.screen;
+ if (floatingIsPictureInPicture) {
+   // Chromium can reduce both dimensions when a scripted enlargement exceeds
+   // a quarter of the screen area. Keep the current height and share the width
+   // already available if the user has sized the window beyond that limit.
+   const maxWidthAtCurrentHeight = Math.floor(screen.width * screen.height / (4 * bounds.height));
+   const extraWidth = Math.max(0, Math.min(floatingPanelWidth, maxWidthAtCurrentHeight - bounds.width));
+   const width = bounds.width + (opening ? extraWidth : 0);
+   const deltaWidth = width - popup.outerWidth;
+   const deltaHeight = bounds.height - popup.outerHeight;
+   try {
+     if (deltaWidth || deltaHeight) popup.resizeBy(deltaWidth, deltaHeight);
+   } catch {
+     // The browser can limit resizing. The panel can still be used in the available space.
+   }
+   return;
+ }
+
+ const left = Number.isFinite(screen.availLeft) ? screen.availLeft : 0;
+ const freeWidth = panelToRight ? left + screen.availWidth - bounds.x - bounds.width : bounds.x - left;
+ const extraWidth = Math.max(0, Math.min(floatingPanelWidth, freeWidth));
+ const width = bounds.width + (opening ? extraWidth : 0);
+ const anchorToRight = opening && !panelToRight;
+ const targetX = actualWidth => bounds.x - (anchorToRight ? actualWidth - bounds.width : 0);
+
+ try {
+   // Make room to the left before growing so the desktop need not reposition the window.
+   if (anchorToRight) popup.moveTo(targetX(width), bounds.y);
+   popup.resizeTo(width, bounds.height);
+   popup.moveTo(targetX(width), bounds.y);
+ } catch {
+   // Layout and manual resizing still work when the browser restricts window commands.
+   return;
+ }
+
+ // Desktop window managers can apply the resize after the click handler returns.
+ popup.requestAnimationFrame(() => popup.requestAnimationFrame(() => {
+   if (floatingWindow !== popup || popup.closed || revision !== floatingLayoutRevision) return;
+   const x = targetX(popup.outerWidth);
+   if (popup.screenX === x && popup.screenY === bounds.y) return;
+   try {
+     popup.moveTo(x, bounds.y);
+   } catch {
+     // The window manager controls placement when moveTo is unavailable.
+   }
+ }));
 }
 
 function toggleTool(id) {
  const wasOpen = !!activeTool;
- if (floatingWindow && !wasOpen && id) {
-   tool.classList.toggle('floating-panel-right', panelOpensToRight(floatingWindow));
+ const popup = floatingWindow;
+ if (!popup || wasOpen === !!id) {
+   tab(id);
+   return;
+ }
+
+ if (id) {
+   collapsedBounds = getFloatingBounds(popup);
+   const {availLeft, availWidth} = popup.screen;
+   const left = Number.isFinite(availLeft) ? availLeft : 0;
+   const center = collapsedBounds.x + collapsedBounds.width / 2;
+   tool.classList.toggle('floating-panel-right', center < left + availWidth / 2);
+   tool.style.setProperty('--floating-rail-width', collapsedBounds.innerWidth + 'px');
  }
  tab(id);
- if (floatingWindow && wasOpen !== !!id) {
-   const width = floatingRailWidth + (id ? floatingPanelWidth : 0);
-   try {
-     floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
-   } catch {
-     // The browser can limit resizing. The window can still be resized manually.
-   }
- }
+ if (collapsedBounds) resizeFloatingLayout(popup, !!id, tool.classList.contains('floating-panel-right'));
 }
 for (const button of tabs) {
  button.addEventListener('click', () => {
@@ -117,13 +177,17 @@ toggleFloatingPane.addEventListener('click', () => toggleTool(activeTool ? null 
 const floatingNotice = $('floatingNotice');
 const floatingError = $('floatingError');
 const floatingLaunch = $('openFloating');
+const floatingWindowLaunch = $('openFloatingWindow');
 const clockStylesheet = document.querySelector('link[rel="stylesheet"]').href;
 const toolHome = tool.parentNode;
 const toolNext = tool.nextSibling;
 
-floatingLaunch.addEventListener('click', async () => {
+floatingLaunch.addEventListener('click', () => openFloatingTools(true));
+floatingWindowLaunch.addEventListener('click', () => openFloatingTools(false));
+
+async function openFloatingTools(pictureInPicture) {
  floatingError.hidden = true;
- if (!window.documentPictureInPicture || window.top !== window) {
+ if (pictureInPicture && (!window.documentPictureInPicture || window.top !== window)) {
    floatingError.textContent = window.top !== window
      ? 'Åpne Klokkeverktøy i en egen fane for å bruke det flytende vinduet.'
      : 'Nettleseren støtter ikke flytende verktøy. Du kan fortsette å bruke denne fanen.';
@@ -132,13 +196,23 @@ floatingLaunch.addEventListener('click', async () => {
  }
  if (floatingWindow) return;
  floatingLaunch.disabled = true;
+ floatingWindowLaunch.disabled = true;
  if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
-   const popup = await window.documentPictureInPicture.requestWindow({width:floatingRailWidth, height:940});
+   const height = Math.min(940, window.screen.availHeight);
+   const popup = pictureInPicture
+     ? await window.documentPictureInPicture.requestWindow({width: floatingRailWidth, height})
+     : window.open('', '_blank', `popup,width=${floatingRailWidth},height=${height},resizable=yes,scrollbars=yes`);
+   if (!popup) throw new Error('Popup unavailable');
+
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
+     floatingIsPictureInPicture = false;
+     collapsedBounds = null;
+     window.removeEventListener('pagehide', closePopup);
      tool.classList.remove('floating-expanded', 'floating-panel-right');
+     tool.style.removeProperty('--floating-rail-width');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
      toggleFloatingPane.hidden = true;
@@ -146,9 +220,14 @@ floatingLaunch.addEventListener('click', async () => {
      floatingNotice.hidden = true;
      tab(lastTool);
      runClockUpdates(window);
-     floatingLaunch.focus();
+     (pictureInPicture ? floatingLaunch : floatingWindowLaunch).focus();
    }, {once:true});
+   function closePopup() {
+     popup.close();
+   }
+   if (!pictureInPicture) window.addEventListener('pagehide', closePopup, {once: true});
    floatingWindow = popup;
+   floatingIsPictureInPicture = pictureInPicture;
    popup.document.documentElement.lang = document.documentElement.lang;
    popup.document.title = 'OPSIX Klokkeverktøy';
    const stylesheet = popup.document.createElement('link');
@@ -170,8 +249,9 @@ floatingLaunch.addEventListener('click', async () => {
    floatingError.hidden = false;
  } finally {
    floatingLaunch.disabled = false;
+   floatingWindowLaunch.disabled = false;
  }
-});
+}
 $('returnFloating').addEventListener('click', () => floatingWindow?.close());
 
 function syncFloatingAppearance() {

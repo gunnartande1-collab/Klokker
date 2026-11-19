@@ -140,7 +140,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
 }
 .time-parts[hidden] { display: none; }
 
-/* Felles hÃƒÆ’Ã‚Â¸yde fÃƒÆ’Ã‚Â¸lger det hÃƒÆ’Ã‚Â¸yeste verktÃƒÆ’Ã‚Â¸yet, ogsÃƒÆ’Ã‚Â¥ ved stÃƒÆ’Ã‚Â¸rre tekst. */
+/* Felles hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¸yde fÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¸lger det hÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¸yeste verktÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¸yet, ogsÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¥ ved stÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¸rre tekst. */
 .tool-panes { display: grid; }
 .tool-panes > .pane { grid-area: 1 / 1; min-width: 0; }
 .tool-panes > .pane[hidden] { display: block !important; visibility: hidden; pointer-events: none; }
@@ -223,7 +223,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
   #heliBox { padding-inline: 9px; }
 }
 
-/* Felles tidsvisning og redigerbare felt for klokkeverktÃ¸yene. */
+/* Felles tidsvisning og redigerbare felt for klokkeverktÃƒÂ¸yene. */
 .time-card, #pause {
   --clock-number-size: clamp(24px, calc(8.5vw * var(--text-scale, 1)), calc(36px * var(--text-scale, 1)));
   --time-column: max(51px, calc(var(--clock-number-size) * 1.42));
@@ -323,7 +323,7 @@ body[data-theme="dag"] .display .time-value { color: inherit; }
 
 .bottom-links { border-top: 1px solid var(--border); }
 
-/* En felles enhetsrad for hvert verktÃ¸y. */
+/* En felles enhetsrad for hvert verktÃƒÂ¸y. */
 .time-unit-headings {
   display: flex;
   justify-content: center;
@@ -347,6 +347,7 @@ body[data-theme="dag"] .display .time-value { color: inherit; }
 #pause .time-segment input::placeholder { opacity: 1; }
 
 .floating-launch { min-height: 40px; padding-inline: 10px; }
+#openFloatingWindow { grid-column: 1 / -1; min-height: 36px; }
 .floating-notice > p, #floatingError { color: var(--muted); }
 .floating-notice > .btn { padding-inline: 12px; }
 .floating-clock[hidden], .floating-toggle[hidden], .floating-notice[hidden] { display: none; }
@@ -371,7 +372,7 @@ body.floating-clocks {
 .floating-clocks .tool > :is(.top, .settings-menu, .bottom-links, .copyright) { display: none; }
 .floating-clocks .tool > .tabs {
   display: grid;
-  flex: 0 0 min(400px, 100%);
+  flex: 0 0 100%;
   container-type: inline-size;
   grid-template-columns: minmax(0, 1fr);
   gap: 3px;
@@ -381,7 +382,9 @@ body.floating-clocks {
   padding: 8px;
 }
 
-.floating-clocks .tool:not(.floating-expanded) > .tabs { flex-basis: 100%; }
+.floating-clocks .tool.floating-expanded > .tabs {
+  flex-basis: min(var(--floating-rail-width, 400px), max(45%, calc(100% - 480px)));
+}
 .floating-clocks .tool.floating-panel-right { flex-direction: row; }
 .floating-clocks .tabs > .tab {
   min-height: 122px;
@@ -435,3 +438,15 @@ body.floating-clocks {
 .floating-clocks .tool-panes .actions { margin-top: 26px; gap: 12px; }
 .floating-clocks .tool-panes .time-card { margin-bottom: 22px; }
 .floating-clocks .tabs .tab-status { font-size: calc(15px * var(--text-scale, 1)); }
+
+@media (max-height: 900px) {
+  .floating-clocks .tabs > .tab {
+    min-height: clamp(44px, calc((100dvh - 120px - min(19cqi, 8dvh, 76px)) / 6), 122px);
+    gap: 3px;
+    padding-block: 4px;
+  }
+  .floating-clocks .tabs > .floating-toggle { min-height: 36px; }
+  .floating-clocks .floating-clock { padding-block: 6px; }
+  .floating-clocks #floatingTime { font-size: clamp(22px, min(19cqi, 8dvh), 76px); }
+  .floating-clocks #floatingDate { font-size: clamp(12px, 2.6dvh, 22px); }
+}
