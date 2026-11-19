@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261119-12">
-    <script src="klokker.js?v=20261119-12" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261119-15">
+    <script src="klokker.js?v=20261119-15" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
         <h1 id="floatingNoticeTitle">Flytende verktøy er åpne</h1>
         <p>La denne fanen stå åpen mens du bruker verktøystripen.</p>
+        <p>Dra i vinduskanten mens stripen er sammenfoldet for å bytte mellom vannrett og loddrett.</p>
         <button class="btn" id="returnFloating" type="button">Vis verktøyene i fanen igjen</button>
     </section>
     <main class="tool" id="clockTool">
@@ -20,13 +21,6 @@
                 <strong>Støtteverktøy</strong>
             </div>
             <div class="header-actions">
-                <label class="floating-layout-choice">
-                    Flytende visning
-                    <select id="floatingLayout">
-                        <option value="vertical">Loddrett</option>
-                        <option value="horizontal">Vannrett</option>
-                    </select>
-                </label>
                 <button class="btn floating-launch" id="openFloating" type="button">Åpne flytende verktøy</button>
                 <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">↗</button>
                 <button id="settingsToggle" class="icon-button" type="button" title="Innstillinger" aria-label="Innstillinger" aria-expanded="false" aria-controls="clockSettings">⚙</button>
@@ -91,7 +85,7 @@
                 aria-expanded="false" aria-controls="clockPanes" aria-label="Vis sist brukte verktøy" hidden>Utvid</button>
         </nav>
         <div class="tool-panes" id="clockPanes">
-            <header class="floating-pane-heading">
+            <header class="floating-pane-heading" id="floatingPaneHeading">
                 <h1>Operatørverktøy</h1>
                 <p id="floatingToolName"></p>
             </header>

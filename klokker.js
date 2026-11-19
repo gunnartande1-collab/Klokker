@@ -33,13 +33,12 @@ const modes={voksen:110,nyfodt:120};
 const tabs = [...tool.querySelectorAll('[data-tab]')];
 const panes = $('clockPanes');
 const toolPanels = [...panes.querySelectorAll('.pane')];
+const floatingPaneHeading = $('floatingPaneHeading');
 const floatingToolName = $('floatingToolName');
 const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
 const floatingRailWidth = 400;
-const floatingPanelWidth = 480;
-const floatingPanelHeight = 440;
-const floatingLayout = $('floatingLayout');
+const floatingPanelWidth = 360;
 let collapsedFloatingWidth = floatingRailWidth;
 let collapsedFloatingHeight = 120;
 
@@ -86,6 +85,15 @@ function tab(id) {
  }
 }
 
+function updateFloatingOrientation(popup) {
+ if (floatingWindow !== popup || activeTool) return;
+ const {innerWidth: width, innerHeight: height} = popup;
+ if (width <= 0 || height <= 0) return;
+ const horizontal = tool.classList.contains('floating-horizontal');
+ // A small buffer around square keeps the strip from flipping back and forth.
+ tool.classList.toggle('floating-horizontal', horizontal ? width > height : width >= height * 1.25);
+}
+
 function panelOpensAbove(popup) {
  const {screenY, outerHeight, screen} = popup;
  const {availTop, availHeight} = screen;
@@ -107,18 +115,19 @@ function toggleTool(id) {
    }
  }
  tab(id);
- if (floatingWindow && wasOpen !== !!id) {
-   try {
-     if (horizontal) {
-       const height = collapsedFloatingHeight + (id ? floatingPanelHeight : 0);
-       floatingWindow.resizeBy(0, height - floatingWindow.innerHeight);
-     } else {
-       const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
-       floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
-     }
-   } catch {
-     // The browser can limit resizing. The window can still be resized manually.
+ if (!floatingWindow || (!id && !wasOpen)) return;
+ try {
+   if (horizontal) {
+     const panelHeight = id ? floatingPaneHeading.offsetHeight + $(id).offsetHeight + 2 : 0;
+     const height = collapsedFloatingHeight + panelHeight;
+     const difference = height - floatingWindow.innerHeight;
+     if (difference) floatingWindow.resizeBy(0, difference);
+   } else if (wasOpen !== !!id) {
+     const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
+     floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
    }
+ } catch {
+   // The browser can limit resizing. The window can still be resized manually.
  }
 }
 for (const button of tabs) {
@@ -154,10 +163,9 @@ floatingLaunch.addEventListener('click', async () => {
  floatingLaunch.disabled = true;
  if (state.options.countSound || state.options.pauseSound) getAudio();
  try {
-   const horizontal = floatingLayout.value === 'horizontal';
    const popup = await window.documentPictureInPicture.requestWindow({
-     width: horizontal ? Math.min(1080, Math.round(window.screen.availWidth * .9)) : floatingRailWidth,
-     height: horizontal ? 120 : initialFloatingHeight(window.screen.availHeight)
+     width: floatingRailWidth,
+     height: initialFloatingHeight(window.screen.availHeight)
    });
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
@@ -174,7 +182,7 @@ floatingLaunch.addEventListener('click', async () => {
      floatingLaunch.focus();
    }, {once:true});
    floatingWindow = popup;
-   tool.classList.toggle('floating-horizontal', horizontal);
+   popup.addEventListener('resize', () => updateFloatingOrientation(popup));
    popup.document.documentElement.lang = document.documentElement.lang;
    popup.document.title = 'OPSIX Klokkeverktøy';
    const stylesheet = popup.document.createElement('link');
@@ -188,6 +196,7 @@ floatingLaunch.addEventListener('click', async () => {
    toggleFloatingPane.hidden = false;
    $('floatingClock').hidden = false;
    tab(null);
+   updateFloatingOrientation(popup);
    runClockUpdates(popup);
    tabs[0].focus();
  } catch {
