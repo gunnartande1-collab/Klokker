@@ -96,12 +96,10 @@ function toggleTool(id) {
  if (floatingWindow && !wasOpen && id) {
    collapsedFloatingWidth = floatingWindow.innerWidth;
    tool.style.setProperty('--floating-strip-width', collapsedFloatingWidth + 'px');
-   const opensBesideStrip = panelOpensToRight(floatingWindow);
-   tool.classList.toggle('floating-panel-right', opensBesideStrip);
-   tool.classList.toggle('floating-panel-below', !opensBesideStrip);
+   tool.classList.toggle('floating-panel-right', panelOpensToRight(floatingWindow));
  }
  tab(id);
- if (floatingWindow && wasOpen !== !!id && tool.classList.contains('floating-panel-right')) {
+ if (floatingWindow && wasOpen !== !!id) {
    const width = collapsedFloatingWidth + (id ? floatingPanelWidth : 0);
    try {
      floatingWindow.resizeBy(width - floatingWindow.innerWidth, 0);
@@ -150,7 +148,7 @@ floatingLaunch.addEventListener('click', async () => {
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
      floatingWindow = null;
-     tool.classList.remove('floating-expanded', 'floating-panel-right', 'floating-panel-below');
+     tool.classList.remove('floating-expanded', 'floating-panel-right');
      tool.style.removeProperty('--floating-strip-width');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
