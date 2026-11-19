@@ -1,14 +1,376 @@
-<!-- LIM INN I HOVEDSIDENS <body>, FOR EKSEMPEL RETT FÃ˜R </body> -->
-<!-- Forutsetter at klokkeverktÃ¸yet ligger pÃ¥ /klokker/ pÃ¥ samme domene. -->
-<button type="button" id="opsixToolsOpen" class="opsix-tools-launcher">â—´ StÃ¸tteverktÃ¸y</button>
-<div id="opsixToolsBackdrop" class="opsix-tools-backdrop" hidden></div>
-<aside id="opsixToolsPanel" class="opsix-tools-panel" aria-label="KlokkeverktÃ¸y" aria-hidden="true">
-  <div class="opsix-tools-toolbar">
-    <strong>OPSIX â€“ KlokkeverktÃ¸y</strong>
-    <button id="opsixToolsPopout" type="button">â†— Eget vindu</button>
-    <button id="opsixToolsClose" type="button" aria-label="Lukk sidepanel">âœ•</button>
-  </div>
-  <iframe id="opsixToolsFrame" src="/klokker/" title="KlokkeverktÃ¸y"></iframe>
-</aside>
-<link rel="stylesheet" href="/klokker/panel.css">
-<script src="/klokker/panel.js" defer></script>
+<!doctype html>
+<html lang="no">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#071426">
+    <title>Klokkeverktøy | OPSIX</title>
+    <link rel="stylesheet" href="klokker.css?v=20261119-8">
+    <script src="klokker.js?v=20261119-10" defer></script>
+</head>
+<body data-theme="natt">
+    <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
+        <h1 id="floatingNoticeTitle">Flytende verktøy er åpne</h1>
+        <p>La denne fanen stå åpen mens du bruker verktøystripen.</p>
+        <button class="btn" id="returnFloating" type="button">Vis verktøyene i fanen igjen</button>
+    </section>
+    <main class="tool" id="clockTool">
+        <header class="top">
+            <div class="brand-title">
+                <strong>Støtteverktøy</strong>
+            </div>
+            <div class="header-actions">
+                <button class="btn floating-launch" id="openFloating" type="button">Åpne flytende verktøy</button>
+                <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">↗</button>
+                <button id="settingsToggle" class="icon-button" type="button" title="Innstillinger" aria-label="Innstillinger" aria-expanded="false" aria-controls="clockSettings">⚙</button>
+            </div>
+        </header>
+        <p id="floatingError" role="status" hidden></p>
+        <div class="settings-menu" id="clockSettings" hidden>
+            <label for="textSize">Zoom:</label>
+            <select id="textSize">
+                <option value="normal">100 %</option>
+                <option value="large">120 %</option>
+                <option value="extra">140 %</option>
+            </select>
+            <label for="theme">Visning:</label>
+            <select id="theme">
+                <option value="system" selected>Følg systemet</option>
+                <option value="dag">Dag</option>
+                <option value="dempet">Dempet</option>
+                <option value="natt">Natt</option>
+            </select>
+        </div>
+        <nav class="tabs" aria-label="Klokkeverktøy">
+            <div class="floating-clock" id="floatingClock" hidden>
+                <time id="floatingTime" aria-label="Norsk tid"></time>
+                <time id="floatingDate"></time>
+            </div>
+            <button class="tab" data-tab="metronom" aria-selected="false">
+                <span class="tab-symbol brand-small" aria-hidden="true">
+                    <svg viewBox="0 0 48 48" fill="none">
+                        <path d="M10 38 19 8h10l9 30H10Z" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/>
+                        <path d="M24 13v20" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+                        <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2"/>
+                    </svg>
+                </span>
+                Metronom
+            </button>
+            <button class="tab" data-tab="helikopter" aria-selected="false">
+                <span class="tab-symbol">🚁</span>
+                Helikopter
+                <small id="heliBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="pause" aria-selected="false">
+                <span class="tab-symbol">☕</span>
+                Pause
+                <small id="pauseBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="nedtelling" aria-selected="false">
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M8 3h16v3l-2 5-5 5 5 5 2 5v3H8v-3l2-5 5-5-5-5-2-5Z" fill="#56a9f5" stroke="#0d294b" stroke-width="2"/><path d="M10 6h12l-2 5-4 4-4-4zm1 20 5-6 5 6Z" fill="#fff0ab"/><path d="M7 3h18M7 29h18" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/></svg></span>
+                Nedtelling
+                <small id="countBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab" data-tab="stoppeklokke" aria-selected="false">
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M16 4v5m-3-5h6m4 6 2-2" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="19" r="10" fill="#63b6fa" stroke="#0d294b" stroke-width="2"/><circle cx="16" cy="19" r="7" fill="#eef9ff"/><path d="M16 14v5l3 2" fill="none" stroke="#164d80" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="19" r="1.25" fill="#164d80"/></svg></span>
+                Stoppeklokke
+                <small id="stopBadge" class="tab-status" hidden></small>
+            </button>
+            <button class="tab active" data-tab="pusteteller" aria-selected="true">
+                <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M13 10c-3-5-7 0-9 5-2 5-2 10 1 11 3 1 8-1 8-5Zm6 0c3-5 7 0 9 5 2 5 2 10-1 11-3 1-8-1-8-5Z" fill="#ff8299" stroke="#7d314a" stroke-width="2"/><path d="M16 4v10m0 0-5 5m5-5 5 5" fill="none" stroke="#ffe2ec" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                Pusteteller
+            </button>
+            <button class="tab floating-toggle" id="toggleFloatingPane" type="button"
+                aria-expanded="false" aria-controls="clockPanes" aria-label="Vis sist brukte verktøy" hidden>Utvid</button>
+        </nav>
+        <div class="tool-panes" id="clockPanes">
+            <header class="floating-pane-heading">
+                <h1>Operatørverktøy</h1>
+                <p id="floatingToolName"></p>
+            </header>
+            <section class="pane" id="metronom" aria-label="Metronom" hidden inert>
+                <div class="display beat-display" id="beatDisplay">
+                    <div id="bpmView" class="bpm-view">
+                        <button type="button" id="bpmLabel" class="bpm-number" title="Trykk for å skrive takt" aria-label="Endre takt">
+                            110 
+                            <span>BPM</span>
+                        </button>
+                        <input id="bpmDirect" class="bpm-direct" type="number" min="1" inputmode="numeric" aria-label="Ny takt" hidden>
+                    </div>
+                    <div class="pulse-line" aria-hidden="true">
+                        <svg viewBox="0 0 240 42" preserveAspectRatio="none">
+                            <defs>
+                                <path id="ecgComplex" d="M0 25 H22 L26 28 L30 7 L34 34 L39 25 H60"/>
+                            </defs>
+                            <g class="ecg-trace">
+                                <use href="#ecgComplex"/>
+                                <use href="#ecgComplex" x="60"/>
+                                <use href="#ecgComplex" x="120"/>
+                                <use id="ecgFourth" href="#ecgComplex" x="180"/>
+                                <path id="ecgVent" d="M180 25 H240" hidden/>
+                            </g>
+                            <line id="beatCursor" x1="30" x2="30" y1="1" y2="41" hidden/>
+                        </svg>
+                    </div>
+                </div>
+                <label class="field-label">Pasientkategori</label>
+                <div class="choices">
+                    <button type="button" class="choice selected" data-mode="voksen">Voksen og barn</button>
+                    <button type="button" class="choice" data-mode="nyfodt">Nyfødt ved fødsel</button>
+                </div>
+                <div class="adjuster" id="bpmAdjust">
+                    <label for="bpmInput">Juster takt</label>
+                    <div>
+                        <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
+                        <input id="bpmInput" type="number" inputmode="numeric" min="1" step="1" value="110">
+                        <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
+                    </div>
+                </div>
+                <p id="metronomeHint" class="hint compact" hidden>90 kompresjoner og 30 ventilasjoner/min</p>
+                <div class="actions">
+                    <button id="metroStart" class="btn primary">▶ Start</button>
+                    <button id="metroPause" class="btn">Ⅱ Pause</button>
+                    <button id="metroReset" class="btn">↻ Nullstill</button>
+                </div>
+            </section>
+            <section class="pane" id="nedtelling" aria-label="Nedtelling" hidden inert>
+                <div class="display time-display time-card" id="countBox">
+                    <div class="time-unit-headings" aria-hidden="true"><span>Timer</span><span>Minutter</span><span>Sekunder</span></div>
+                    <div id="countDisplay" class="time-parts time-value adjustable-time" role="group" aria-label="Nedtellingstid" aria-describedby="countError">
+                        <div class="time-segment">
+                            <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Nedtellingstid – timer" data-max="99" value="00">
+                            <div class="time-steps">
+                                <button type="button" class="time-step" data-step="-1" aria-label="Reduser timer">−</button>
+                                <button type="button" class="time-step" data-step="1" aria-label="Øk timer">+</button>
+                            </div>
+                        </div>
+                        <span aria-hidden="true">:</span>
+                        <div class="time-segment">
+                            <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Nedtellingstid – minutter" data-max="59" value="00">
+                            <div class="time-steps">
+                                <button type="button" class="time-step" data-step="-1" aria-label="Reduser minutter">−</button>
+                                <button type="button" class="time-step" data-step="1" aria-label="Øk minutter">+</button>
+                            </div>
+                        </div>
+                        <span aria-hidden="true">:</span>
+                        <div class="time-segment">
+                            <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Nedtellingstid – sekunder" data-max="59" value="00">
+                            <div class="time-steps">
+                                <button type="button" class="time-step" data-step="-1" aria-label="Reduser sekunder">−</button>
+                                <button type="button" class="time-step" data-step="1" aria-label="Øk sekunder">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <span id="countState" hidden></span>
+                    <span id="countError" role="alert" hidden>Bruk tt:mm:ss. Minutter og sekunder må være mellom 00 og 59.</span>
+                </div>
+                <div class="toggle-list">
+                    <div class="toggle-row">
+                        <span>Lydvarsel ved endt nedtelling?</span>
+                        <div class="binary" data-setting="countSound">
+                            <button class="selected" data-value="yes">Ja</button>
+                            <button data-value="no">Nei</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button id="countStart" class="btn primary">▶ Start</button>
+                    <button id="countPause" class="btn">Ⅱ Pause</button>
+                    <button id="countReset" class="btn">↻ Nullstill</button>
+                </div>
+            </section>
+            <section class="pane" id="stoppeklokke" aria-label="Stoppeklokke" hidden inert>
+                <div class="display time-display time-card">
+                    <div class="time-unit-headings" aria-hidden="true"><span>Timer</span><span>Minutter</span><span>Sekunder</span></div>
+                    <strong class="time-value" id="stopDisplay">00:00:00</strong>
+                </div>
+                <div class="actions">
+                    <button id="stopStart" class="btn primary">▶ Start</button>
+                    <button id="stopPause" class="btn">Ⅱ Pause</button>
+                    <button id="stopReset" class="btn">↻ Nullstill</button>
+                </div>
+            </section>
+            <section class="pane" id="pusteteller" aria-label="Pusteteller">
+                <p class="subtitle">
+                    Trykk én gang for hvert observerte åndedrag.
+                    <br>
+                    Estimat etter minimum 2 pust og 10 sekunder.
+                </p>
+                <div class="display breath-display" id="breathBox">
+                    <strong id="breathCount">0</strong>
+                    <span>registrerte pust</span>
+                    <div class="breath-result">
+                        Anslått RF 
+                        <b id="breathRate">–</b>
+                        <span>/min</span>
+                    </div>
+                    <span class="observation" id="breathTime">Observasjon 00:00 / 01:00</span>
+                </div>
+                <button type="button" class="btn primary big-breath" id="breathTap">+ Registrer pust</button>
+                <div class="actions two">
+                    <button id="breathUndo" class="btn" type="button" disabled>− Fjern siste pust</button>
+                    <button id="breathReset" class="btn">↻ Nullstill</button>
+                </div>
+            </section>
+            <section class="pane" id="pause" aria-label="Pause" hidden inert>
+                <div class="display time-card pause-box" id="pauseBox">
+                    <div class="time-unit-headings time-unit-headings-end" aria-hidden="true"><span>Timer</span><span>Minutter</span></div>
+                    <div class="pause-time-row time-row">
+                        <span class="time-label">Matpause</span>
+                        <div id="mealTime" class="time-parts time-value adjustable-time" role="group" aria-label="Matpause">
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Matpause – timer" data-max="23" placeholder="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser timer">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk timer">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Matpause – minutter" data-max="59" placeholder="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser minutter">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk minutter">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pause-time-row time-row">
+                        <span class="time-label">Skjermpause</span>
+                        <div id="screenTime" class="time-parts time-value adjustable-time" role="group" aria-label="Skjermpause">
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Skjermpause – timer" data-max="23" placeholder="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser timer">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk timer">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" spellcheck="false" aria-label="Skjermpause – minutter" data-max="59" placeholder="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser minutter">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk minutter">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="pauseState" role="status"></p>
+                </div>
+                <div class="toggle-row">
+                    <span>Lydvarsel når pausen starter?</span>
+                    <div class="binary" data-setting="pauseSound">
+                        <button class="selected" data-value="yes" aria-pressed="true">Ja</button>
+                        <button data-value="no" aria-pressed="false">Nei</button>
+                    </div>
+                </div>
+                <p id="pauseError" role="alert" hidden>Skriv et klokkeslett mellom 00:00 og 23:59.</p>
+                <p id="pauseSoundError" role="status" hidden>Lydvarsel er utilgjengelig i nettleseren. Pause markeres visuelt.</p>
+                <div class="actions two">
+                    <button class="btn primary" id="pauseSave">Lagre pauser</button>
+                    <button class="btn" id="pauseReset">↻ Nullstill</button>
+                </div>
+            </section>
+            <section class="pane" id="helikopter" aria-label="Helikoptervarsling" hidden inert>
+                <div class="display heli-display time-card" id="heliBox">
+                    <div class="time-unit-headings time-unit-headings-end" aria-hidden="true"><span>Timer</span><span>Minutter</span><span>Sekunder</span></div>
+                    <div class="time-row heli-entry-row">
+                        <span class="time-label">ETE</span>
+                        <div id="heliDuration" class="time-parts time-value adjustable-time" role="group" aria-label="Tid til forventet landing" aria-describedby="heliError">
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – timer" data-max="99" value="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser timer: Tid til forventet landing">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk timer: Tid til forventet landing">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – minutter" data-max="59" value="03">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser minutter: Tid til forventet landing">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk minutter: Tid til forventet landing">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid til forventet landing – sekunder" data-max="59" value="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser sekunder: Tid til forventet landing">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk sekunder: Tid til forventet landing">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <strong class="time-value" id="heliTime" role="timer" hidden>00:03:00</strong>
+                    </div>
+                    <div class="time-row heli-entry-row heli-warning-setting">
+                        <span class="time-label">Tid igjen ved varsling</span>
+                        <div id="heliWarning" class="time-parts time-value adjustable-time" role="group" aria-label="Tid igjen ved varsling" aria-describedby="heliError">
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid igjen ved varsling – timer" data-max="99" value="00">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser timer: Tid igjen ved varsling">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk timer: Tid igjen ved varsling">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid igjen ved varsling – minutter" data-max="59" value="01">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser minutter: Tid igjen ved varsling">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk minutter: Tid igjen ved varsling">+</button>
+                                </div>
+                            </div>
+                            <span aria-hidden="true">:</span>
+                            <div class="time-segment">
+                                <input type="text" inputmode="numeric" maxlength="2" autocomplete="off" aria-label="Tid igjen ved varsling – sekunder" data-max="59" value="30">
+                                <div class="time-steps">
+                                    <button type="button" class="time-step" data-step="-1" aria-label="Reduser sekunder: Tid igjen ved varsling">−</button>
+                                    <button type="button" class="time-step" data-step="1" aria-label="Øk sekunder: Tid igjen ved varsling">+</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="heliError" role="alert" hidden></p>
+                    <div class="heli-timeline" id="heliTimeline" aria-label="Tidslinje for landing">
+                        <span class="heli-timeline-start">Start</span>
+                        <span class="heli-timeline-end">Landing</span>
+                        <div class="heli-timeline-track">
+                            <progress id="heliProgress" max="180" value="0" aria-label="Nedtellingens fremdrift"></progress>
+                            <span class="heli-tick heli-tick-start" aria-hidden="true"></span>
+                            <span class="heli-tick heli-tick-warning" id="heliWarningTick" aria-hidden="true"></span>
+                            <span class="heli-tick heli-tick-end" aria-hidden="true"></span>
+                        </div>
+                        <span class="heli-timeline-warning" id="heliWarningMark">Varsling</span>
+                    </div>
+                    <p id="heliAlarm" role="alert" hidden>🔔 Aktiver landingsvarsel!</p>
+                    <button id="heliAck" class="btn full" type="button" hidden>✓ Varsling aktivert</button>
+                </div>
+                <div class="actions two">
+                    <button id="heliStart" class="btn primary" type="button">▶ Start</button>
+                    <button id="heliReset" class="btn" type="button">↻ Nullstill</button>
+                </div>
+            </section>
+        </div>
+        <div class="bottom-links">
+            <button id="versionButton">V1.1.0 · Versjonslogg</button>
+            <button id="feedbackButton">Send tilbakemelding ↗</button>
+        </div>
+        <p class="copyright">© 2026 OPSIX · Utviklet av Gunnar Tande</p>
+    </main>
+    <dialog id="versionDialog">
+        <h2>Versjonslogg</h2>
+        <p>
+            <b>V1.1.0 – 09.11.2026</b>
+            <br>
+            Seks faner, pausevarsler, lysnivåer, taktinnstilling, nedtellingsvarsler og oppdatert pusteteller.
+        </p>
+        <p>
+            <b>V1.0.0 – 06.11.2026</b>
+            <br>
+            Første prototype: metronom, nedtelling, stoppeklokke og pusteteller.
+        </p>
+        <button id="closeVersion" class="btn">Lukk</button>
+    </dialog>
+</body>
+</html>

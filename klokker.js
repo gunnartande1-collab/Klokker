@@ -182,6 +182,15 @@ floatingLaunch.addEventListener('click', async () => {
    }, {once:true});
    floatingWindow = popup;
 
+   console.log('PiP properties', {
+     moveTo: typeof popup.moveTo,
+     moveBy: typeof popup.moveBy,
+     screenX: popup.screenX,
+     screenY: popup.screenY,
+     outerWidth: popup.outerWidth,
+     outerHeight: popup.outerHeight
+   });
+
    popup.addEventListener('resize', () => {
      console.log('PiP resize event', {
        screenX: popup.screenX,
