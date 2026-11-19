@@ -707,3 +707,4 @@ window.addEventListener('focus', render);
 setMode('voksen');
 runClockUpdates(window);
 })();
+
