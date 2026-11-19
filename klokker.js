@@ -261,14 +261,15 @@ function restartMetroCycle() {
  metro.step = 0;
 }
 $('metroStart').addEventListener('click', () => {
+ if (state.metro.running) {
+   state.metro.running = false;
+   stopTones(metroTones);
+   render();
+   return;
+ }
  if (!getAudio()) { alert('Lyd støttes ikke av denne nettleseren.'); return; }
  state.metro.running = true;
  restartMetroCycle();
- render();
-});
-$('metroPause').addEventListener('click', () => {
- state.metro.running = false;
- stopTones(metroTones);
  render();
 });
 $('metroReset').addEventListener('click', () => {
@@ -402,11 +403,15 @@ countInput.group.addEventListener('input', () => {
  render();
 });
 countInput.group.addEventListener('keydown', event => {
- if (event.key === 'Enter' && event.target.matches('input')) $('countStart').click();
+ if (event.key === 'Enter' && event.target.matches('input') && !state.count.running) $('countStart').click();
 });
 $('countStart').addEventListener('click', () => {
  const countdown = state.count;
- if (countdown.running || countdown.finished) return;
+ if (countdown.running) {
+   pauseCountdown(countdown);
+   return;
+ }
+ if (countdown.finished) return;
  if (countdown.edited) {
    const parts = countInput.read();
    $('countError').hidden = !!parts;
@@ -430,9 +435,7 @@ function finishCountdown() {
  countdown.lastAlarm = null;
  if (!$('nedtelling').hidden) countBox.classList.add('count-flash');
 }
-$('countPause').addEventListener('click', () => {
- const countdown = state.count;
- if (!countdown.running) return;
+function pauseCountdown(countdown) {
  countdown.remaining = remaining();
  if (!countdown.remaining) finishCountdown();
  else {
@@ -440,7 +443,7 @@ $('countPause').addEventListener('click', () => {
    countdown.paused = true;
  }
  render();
-});
+}
 $('countReset').addEventListener('click', () => {
  clearCountAlert();
  Object.assign(state.count, {running:false, remaining:0, initial:0, edited:false, paused:false});
@@ -448,7 +451,21 @@ $('countReset').addEventListener('click', () => {
  render();
 });
 for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){if(state.options.pauseSound) unlockPauseAudio();else stopTones(pauseTones)}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
-$('stopStart').addEventListener('click',()=>{let s=state.stop;if(s.running)return;s.start=Date.now();s.running=true;render()});$('stopPause').addEventListener('click',()=>{let s=state.stop;if(s.running){s.elapsed+=Date.now()-s.start;s.running=false}render()});$('stopReset').addEventListener('click',()=>{Object.assign(state.stop,{running:false,elapsed:0,start:0});render()});
+$('stopStart').addEventListener('click', () => {
+ const stopwatch = state.stop;
+ const now = Date.now();
+ if (stopwatch.running) {
+   stopwatch.elapsed += now - stopwatch.start;
+ } else {
+   stopwatch.start = now;
+ }
+ stopwatch.running = !stopwatch.running;
+ render();
+});
+$('stopReset').addEventListener('click', () => {
+ Object.assign(state.stop, {running:false, elapsed:0, start:0});
+ render();
+});
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
 const pauseSoundButtons = tool.querySelectorAll('[data-setting="pauseSound"] button');
@@ -554,9 +571,7 @@ function renderPauses(now) {
  for (const button of pauseSoundButtons) button.disabled = due && state.options.pauseSound;
  $('pauseBadge').hidden = !due;
  $('pauseBadge').textContent = due ? 'NÅ' : '';
- const next = state.pauses.filter(pause => pause.time > now).sort((a,b) => a.time-b.time)[0];
- const message = due ? [...new Set([...pendingPauseAlarms].map(pause => pause.type))].join(' + ') + ' nå'
-   : next ? 'Neste: ' + next.type + ' kl. ' + next.label : '';
+ const message = due ? [...new Set([...pendingPauseAlarms].map(pause => pause.type))].join(' + ') + ' nå' : '';
  if ($('pauseState').textContent !== message) $('pauseState').textContent = message;
 }
 
@@ -669,6 +684,7 @@ function renderLanding() {
  $('heliBox').classList.toggle('heli-overtime', ms <= -1000 && !alert);
  $('heliAlarm').hidden = $('heliAck').hidden = !alert;
  $('heliStart').disabled = active;
+ $('heliStart').hidden = alert;
  heliTab.classList.toggle('heli-alert', alert);
  $('heliBadge').hidden = !active;
  $('heliBadge').textContent = alert ? 'VARSLING' : time;
@@ -692,6 +708,11 @@ function updateActiveClockIndicator(now) {
  document.documentElement.toggleAttribute('data-opsix-active-clock', hasActiveClock);
 }
 
+function updateClockButton(id, label) {
+ const button = $(id);
+ if (button.textContent !== label) button.textContent = label;
+}
+
 function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if (c.running && remaining() <= 0) finishCountdown();
  const displayedTime = formatCountdown(remaining());
@@ -707,7 +728,6 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
  const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);
- for(const [start,pause,running] of [['metroStart','metroPause',m.running],['stopStart','stopPause',s.running]]){$(start).disabled=running;$(pause).disabled=!running}
  $('countBadge').hidden=!c.running;$('countBadge').textContent=c.running?displayedTime:'';$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
  $('breathUndo').disabled = !state.breaths.length;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
@@ -717,8 +737,10 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('breathBox').classList.toggle('observed', age >= 60000);
  renderPauses(now);
  updateActiveClockIndicator(now);
- $('countStart').disabled = c.running || c.finished;
- $('countPause').disabled = !c.running;
+ updateClockButton('metroStart', m.running ? '■ Stopp' : '▶ Start');
+ updateClockButton('countStart', c.running ? 'Ⅱ Pause' : c.paused ? '▶ Fortsett' : '▶ Start');
+ updateClockButton('stopStart', s.running ? 'Ⅱ Pause' : s.elapsed > 0 ? '▶ Fortsett' : '▶ Start');
+ $('countStart').disabled = c.finished;
  for (const button of countSoundButtons) button.disabled = c.finished && state.options.countSound;
  renderFloatingClock(now);
  const landingTime = renderLanding();

@@ -181,10 +181,7 @@ body[data-text-size]:not([data-text-size="normal"]) .toggle-row { flex-wrap: wra
   width: 35px;
   height: 35px;
 }
-#nedtelling .toggle-list { margin-top: 24px; }
 #nedtelling > .actions { margin-top: 30px; }
-
-#helikopter > .actions { margin-top: 24px; }
 
 .heli-timeline {
   --warning-position: 50%;
@@ -433,7 +430,6 @@ body.floating-clocks {
 }
 .floating-clocks .pane .field-label { margin: 0; }
 .floating-clocks .pane .adjuster { margin: 0; }
-.floating-clocks .pane#nedtelling .toggle-list { margin-top: 8px; }
 .floating-clocks .pane .hint { min-height: 0; }
 .floating-clocks .pane .toggle-row { gap: 6px; }
 
@@ -453,4 +449,46 @@ body.floating-clocks {
   .floating-clocks .tool-panes .pane :is(.subtitle, .hint, .toggle-list, .actions) { margin: 0; }
   .floating-clocks .pane > p:not(.subtitle, .hint) { margin: 0; }
   .floating-clocks .pane#helikopter { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+
+
+.clock-sound-setting { grid-column: 1 / -1; }
+.metro-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: start;
+}
+.metro-categories .choices { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.metro-controls .adjuster {
+  margin: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.metro-controls > :is(.hint, .actions) { grid-column: 1 / -1; }
+.metro-controls .actions { margin-top: 0; }
+.heli-controls { min-width: 0; }
+.heli-controls .heli-timeline { margin-inline: 4px; }
+.heli-controls #heliAck { grid-column: auto; }
+.heli-controls button[hidden] { display: none; }
+
+.floating-clocks .metro-controls .choice { min-height: 32px; }
+.floating-clocks .metro-controls .adjuster input { width: 46px; }
+.floating-clocks .metro-controls .adjuster button { width: 30px; }
+.floating-clocks .metro-controls .hint { margin: 0; }
+.floating-clocks #heliBox .heli-entry-row { margin-block: 2px; }
+.floating-clocks #heliBox .heli-warning-setting { padding-top: 5px; margin-top: 5px; }
+.floating-clocks #heliBox .time-step { min-height: 23px; }
+.floating-clocks #pauseBox .pause-time-row { min-height: 42px; }
+.floating-clocks #pauseBox .pause-time-row + .pause-time-row { margin-top: 4px; padding-top: 4px; }
+.floating-clocks .heli-controls #heliAlarm { margin: 5px 0; font-size: 13px; }
+.floating-clocks .heli-controls #heliAlarm[hidden] { display: block; visibility: hidden; }
+
+@media (min-width: 580px) {
+  .floating-clocks .pane:is(#metronom, #pause, #nedtelling) { --control-rows: 1; }
+  .floating-clocks .pane > .metro-controls > .actions { margin: 0; }
+  .floating-clocks .pane#helikopter { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+  .floating-clocks .pane#pause > .actions { grid-row: 1; }
+  .floating-clocks .pane#pause > p { grid-column: 1 / -1; }
 }

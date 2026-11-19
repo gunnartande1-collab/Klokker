@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
     <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261119-16">
-    <script src="klokker.js?v=20261119-16" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261119-17">
+    <script src="klokker.js?v=20261119-17" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
@@ -40,6 +40,20 @@
                 <option value="dempet">Dempet</option>
                 <option value="natt">Natt</option>
             </select>
+            <div class="toggle-row clock-sound-setting">
+                <span id="countSoundLabel">Lyd ved endt nedtelling</span>
+                <div class="binary" data-setting="countSound" role="group" aria-labelledby="countSoundLabel">
+                    <button type="button" class="selected" data-value="yes" aria-pressed="true">På</button>
+                    <button type="button" data-value="no" aria-pressed="false">Av</button>
+                </div>
+            </div>
+            <div class="toggle-row clock-sound-setting">
+                <span id="pauseSoundLabel">Lyd ved pausestart</span>
+                <div class="binary" data-setting="pauseSound" role="group" aria-labelledby="pauseSoundLabel">
+                    <button type="button" class="selected" data-value="yes" aria-pressed="true">På</button>
+                    <button type="button" data-value="no" aria-pressed="false">Av</button>
+                </div>
+            </div>
         </div>
         <nav class="tabs" aria-label="Klokkeverktøy">
             <div class="floating-clock" id="floatingClock" hidden>
@@ -88,7 +102,7 @@
                 <div class="display beat-display" id="beatDisplay">
                     <div id="bpmView" class="bpm-view">
                         <button type="button" id="bpmLabel" class="bpm-number" title="Trykk for å skrive takt" aria-label="Endre takt">
-                            110 
+                            110
                             <span>BPM</span>
                         </button>
                         <input id="bpmDirect" class="bpm-direct" type="number" min="1" inputmode="numeric" aria-label="Ny takt" hidden>
@@ -109,24 +123,27 @@
                         </svg>
                     </div>
                 </div>
-                <label class="field-label">Pasientkategori</label>
-                <div class="choices">
-                    <button type="button" class="choice selected" data-mode="voksen">Voksen og barn</button>
-                    <button type="button" class="choice" data-mode="nyfodt">Nyfødt ved fødsel</button>
-                </div>
-                <div class="adjuster" id="bpmAdjust">
-                    <label for="bpmInput">Juster takt</label>
-                    <div>
-                        <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
-                        <input id="bpmInput" type="number" inputmode="numeric" min="1" step="1" value="110">
-                        <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
+                <div class="metro-controls">
+                    <div class="metro-categories">
+                        <label class="field-label">Pasientkategori</label>
+                        <div class="choices">
+                            <button type="button" class="choice selected" data-mode="voksen">Voksen og barn</button>
+                            <button type="button" class="choice" data-mode="nyfodt">Nyfødt ved fødsel</button>
+                        </div>
                     </div>
-                </div>
-                <p id="metronomeHint" class="hint compact" hidden>90 kompresjoner og 30 ventilasjoner/min</p>
-                <div class="actions">
-                    <button id="metroStart" class="btn primary">▶ Start</button>
-                    <button id="metroPause" class="btn">Ⅱ Pause</button>
-                    <button id="metroReset" class="btn">↻ Nullstill</button>
+                    <div class="adjuster" id="bpmAdjust">
+                        <label for="bpmInput">Juster takt</label>
+                        <div>
+                            <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
+                            <input id="bpmInput" type="number" inputmode="numeric" min="1" step="1" value="110">
+                            <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
+                        </div>
+                    </div>
+                    <p id="metronomeHint" class="hint compact" hidden>90 kompresjoner og 30 ventilasjoner/min</p>
+                    <div class="actions two">
+                        <button id="metroStart" class="btn primary">▶ Start</button>
+                        <button id="metroReset" class="btn">↻ Nullstill</button>
+                    </div>
                 </div>
             </section>
             <section class="pane" id="nedtelling" aria-label="Nedtelling" hidden inert>
@@ -160,18 +177,8 @@
                     <span id="countState" hidden></span>
                     <span id="countError" role="alert" hidden>Bruk tt:mm:ss. Minutter og sekunder må være mellom 00 og 59.</span>
                 </div>
-                <div class="toggle-list">
-                    <div class="toggle-row">
-                        <span>Lydvarsel ved endt nedtelling?</span>
-                        <div class="binary" data-setting="countSound">
-                            <button class="selected" data-value="yes">Ja</button>
-                            <button data-value="no">Nei</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="actions">
+                <div class="actions two">
                     <button id="countStart" class="btn primary">▶ Start</button>
-                    <button id="countPause" class="btn">Ⅱ Pause</button>
                     <button id="countReset" class="btn">↻ Nullstill</button>
                 </div>
             </section>
@@ -180,9 +187,8 @@
                     <div class="time-unit-headings" aria-hidden="true"><span>Timer</span><span>Minutter</span><span>Sekunder</span></div>
                     <strong class="time-value" id="stopDisplay">00:00:00</strong>
                 </div>
-                <div class="actions">
+                <div class="actions two">
                     <button id="stopStart" class="btn primary">▶ Start</button>
-                    <button id="stopPause" class="btn">Ⅱ Pause</button>
                     <button id="stopReset" class="btn">↻ Nullstill</button>
                 </div>
             </section>
@@ -196,7 +202,7 @@
                     <strong id="breathCount">0</strong>
                     <span>registrerte pust</span>
                     <div class="breath-result">
-                        Anslått RF 
+                        Anslått RF
                         <b id="breathRate">–</b>
                         <span>/min</span>
                     </div>
@@ -252,13 +258,6 @@
                         </div>
                     </div>
                     <p id="pauseState" role="status"></p>
-                </div>
-                <div class="toggle-row">
-                    <span>Lydvarsel når pausen starter?</span>
-                    <div class="binary" data-setting="pauseSound">
-                        <button class="selected" data-value="yes" aria-pressed="true">Ja</button>
-                        <button data-value="no" aria-pressed="false">Nei</button>
-                    </div>
                 </div>
                 <p id="pauseError" role="alert" hidden>Skriv et klokkeslett mellom 00:00 og 23:59.</p>
                 <p id="pauseSoundError" role="status" hidden>Lydvarsel er utilgjengelig i nettleseren. Pause markeres visuelt.</p>
@@ -328,6 +327,8 @@
                         </div>
                     </div>
                     <p id="heliError" role="alert" hidden></p>
+                </div>
+                <div class="heli-controls">
                     <div class="heli-timeline" id="heliTimeline" aria-label="Tidslinje for landing">
                         <span class="heli-timeline-start">Start</span>
                         <span class="heli-timeline-end">Landing</span>
@@ -340,11 +341,11 @@
                         <span class="heli-timeline-warning" id="heliWarningMark">Varsling</span>
                     </div>
                     <p id="heliAlarm" role="alert" hidden>🔔 Aktiver landingsvarsel!</p>
-                    <button id="heliAck" class="btn full" type="button" hidden>✓ Varsling aktivert</button>
-                </div>
-                <div class="actions two">
-                    <button id="heliStart" class="btn primary" type="button">▶ Start</button>
-                    <button id="heliReset" class="btn" type="button">↻ Nullstill</button>
+                    <div class="actions two">
+                        <button id="heliStart" class="btn primary" type="button">▶ Start</button>
+                        <button id="heliAck" class="btn full" type="button" hidden>✓ Varsling aktivert</button>
+                        <button id="heliReset" class="btn" type="button">↻ Nullstill</button>
+                    </div>
                 </div>
             </section>
         </div>
