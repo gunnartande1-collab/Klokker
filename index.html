@@ -4,9 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#071426">
-    <title>Klokkeverktøy | OPSIX</title>
-    <link rel="stylesheet" href="klokker.css?v=20261119-18">
-    <script src="klokker.js?v=20261119-18" defer></script>
+    <title>Operatørverktøy | OPSIX</title>
+    <link rel="icon" href="opsix-x-192.png" sizes="192x192" type="image/png">
+    <link rel="apple-touch-icon" href="opsix-x-192.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="klokker.css?v=20261124-3">
+    <script src="klokker.js?v=20261124-3" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
@@ -17,11 +20,28 @@
     <main class="tool" id="clockTool">
         <header class="top">
             <div class="brand-title">
-                <strong>Støtteverktøy</strong>
+                <strong>Operatørverktøy</strong>
+            </div>
+            <div class="floating-clock" id="floatingClock">
+                <time id="floatingTime" aria-label="Norsk tid"></time>
+                <time id="floatingDate"></time>
             </div>
             <div class="header-actions">
-                <button class="btn floating-launch" id="openFloating" type="button">Åpne flytende verktøy</button>
-                <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">↗</button>
+                <button id="openFloating" class="icon-button" type="button" title="Flytende knapper" aria-label="Åpne flytende knapper">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <rect x="3" y="4" width="18" height="4" rx="1"/>
+                        <rect x="3" y="10" width="18" height="4" rx="1"/>
+                        <rect x="3" y="16" width="18" height="4" rx="1"/>
+                    </svg>
+                </button>
+                <button id="openWindow" class="icon-button" type="button" title="Åpne nytt klokkevindu" aria-label="Åpne nytt klokkevindu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false">
+                        <rect x="3" y="3.5" width="18" height="17" rx="2"/>
+                        <path d="M3 8.5h18"/>
+                        <circle cx="6.5" cy="6" r=".65" fill="currentColor" stroke="none"/>
+                        <circle cx="9.5" cy="6" r=".65" fill="currentColor" stroke="none"/>
+                    </svg>
+                </button>
                 <button id="settingsToggle" class="icon-button" type="button" title="Innstillinger" aria-label="Innstillinger" aria-expanded="false" aria-controls="clockSettings">⚙</button>
             </div>
         </header>
@@ -40,26 +60,8 @@
                 <option value="dempet">Dempet</option>
                 <option value="natt">Natt</option>
             </select>
-            <div class="toggle-row clock-sound-setting">
-                <span id="countSoundLabel">Lyd ved endt nedtelling</span>
-                <div class="binary" data-setting="countSound" role="group" aria-labelledby="countSoundLabel">
-                    <button type="button" class="selected" data-value="yes" aria-pressed="true">På</button>
-                    <button type="button" data-value="no" aria-pressed="false">Av</button>
-                </div>
-            </div>
-            <div class="toggle-row clock-sound-setting">
-                <span id="pauseSoundLabel">Lyd ved pausestart</span>
-                <div class="binary" data-setting="pauseSound" role="group" aria-labelledby="pauseSoundLabel">
-                    <button type="button" class="selected" data-value="yes" aria-pressed="true">På</button>
-                    <button type="button" data-value="no" aria-pressed="false">Av</button>
-                </div>
-            </div>
         </div>
-        <nav class="tabs" aria-label="Klokkeverktøy">
-            <div class="floating-clock" id="floatingClock" hidden>
-                <time id="floatingTime" aria-label="Norsk tid"></time>
-                <time id="floatingDate"></time>
-            </div>
+        <nav class="tabs" aria-label="Verktøylinje">
             <button class="tab" data-tab="metronom" aria-selected="false">
                 <span class="tab-symbol brand-small" aria-hidden="true">
                     <svg viewBox="0 0 48 48" fill="none">
@@ -68,34 +70,32 @@
                         <path d="M29 29h6l3-6 3 10 3-4h3" stroke="#ff5466" stroke-width="2"/>
                     </svg>
                 </span>
-                Metronom
+                <span class="tab-label">Metronom</span>
             </button>
             <button class="tab" data-tab="helikopter" aria-selected="false">
                 <span class="tab-symbol">🚁</span>
-                Helikopter
+                <span class="tab-label">Helikopter</span>
                 <small id="heliBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="pause" aria-selected="false">
                 <span class="tab-symbol">☕</span>
-                Pause
+                <span class="tab-label">Pause</span>
                 <small id="pauseBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="nedtelling" aria-selected="false">
                 <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M8 3h16v3l-2 5-5 5 5 5 2 5v3H8v-3l2-5 5-5-5-5-2-5Z" fill="#56a9f5" stroke="#0d294b" stroke-width="2"/><path d="M10 6h12l-2 5-4 4-4-4zm1 20 5-6 5 6Z" fill="#fff0ab"/><path d="M7 3h18M7 29h18" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/></svg></span>
-                Nedtelling
+                <span class="tab-label">Nedtelling</span>
                 <small id="countBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab" data-tab="stoppeklokke" aria-selected="false">
                 <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M16 4v5m-3-5h6m4 6 2-2" stroke="#0d294b" stroke-width="3" stroke-linecap="round"/><circle cx="16" cy="19" r="10" fill="#63b6fa" stroke="#0d294b" stroke-width="2"/><circle cx="16" cy="19" r="7" fill="#eef9ff"/><path d="M16 14v5l3 2" fill="none" stroke="#164d80" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="19" r="1.25" fill="#164d80"/></svg></span>
-                Stoppeklokke
+                <span class="tab-label">Stoppeklokke</span>
                 <small id="stopBadge" class="tab-status" hidden></small>
             </button>
             <button class="tab active" data-tab="pusteteller" aria-selected="true">
                 <span class="tab-symbol tool-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 32 32"><path d="M13 10c-3-5-7 0-9 5-2 5-2 10 1 11 3 1 8-1 8-5Zm6 0c3-5 7 0 9 5 2 5 2 10-1 11-3 1-8-1-8-5Z" fill="#ff8299" stroke="#7d314a" stroke-width="2"/><path d="M16 4v10m0 0-5 5m5-5 5 5" fill="none" stroke="#ffe2ec" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                Pusteteller
+                <span class="tab-label">Pusteteller</span>
             </button>
-            <button class="tab floating-toggle" id="toggleFloatingPane" type="button"
-                aria-expanded="false" aria-controls="clockPanes" aria-label="Vis sist brukte verktøy" hidden>Utvid</button>
         </nav>
         <div class="tool-panes" id="clockPanes">
             <section class="pane" id="metronom" aria-label="Metronom" hidden inert>
@@ -116,21 +116,13 @@
                                 <use href="#ecgComplex"/>
                                 <use href="#ecgComplex" x="60"/>
                                 <use href="#ecgComplex" x="120"/>
-                                <use id="ecgFourth" href="#ecgComplex" x="180"/>
-                                <path id="ecgVent" d="M180 25 H240" hidden/>
+                                <use href="#ecgComplex" x="180"/>
                             </g>
                             <line id="beatCursor" x1="30" x2="30" y1="1" y2="41" hidden/>
                         </svg>
                     </div>
                 </div>
                 <div class="metro-controls">
-                    <div class="metro-categories">
-                        <label class="field-label">Pasientkategori</label>
-                        <div class="choices">
-                            <button type="button" class="choice selected" data-mode="voksen">Voksen og barn</button>
-                            <button type="button" class="choice" data-mode="nyfodt">Nyfødt ved fødsel</button>
-                        </div>
-                    </div>
                     <div class="adjuster" id="bpmAdjust">
                         <label for="bpmInput">Juster takt</label>
                         <div>
@@ -139,7 +131,6 @@
                             <button id="bpmUp" type="button" aria-label="Øk BPM">+</button>
                         </div>
                     </div>
-                    <p id="metronomeHint" class="hint compact" hidden>90 kompresjoner og 30 ventilasjoner/min</p>
                     <div class="actions two">
                         <button id="metroStart" class="btn primary">▶ Start</button>
                         <button id="metroReset" class="btn">↻ Nullstill</button>
@@ -194,13 +185,11 @@
             </section>
             <section class="pane" id="pusteteller" aria-label="Pusteteller">
                 <p class="subtitle">
-                    Trykk én gang for hvert observerte åndedrag.
-                    <br>
                     Estimat etter minimum 2 pust og 10 sekunder.
                 </p>
                 <div class="display breath-display" id="breathBox">
                     <strong id="breathCount">0</strong>
-                    <span>registrerte pust</span>
+                    <span>Registrerte pust</span>
                     <div class="breath-result">
                         Anslått RF
                         <b id="breathRate">–</b>
@@ -261,9 +250,10 @@
                 </div>
                 <p id="pauseError" role="alert" hidden>Skriv et klokkeslett mellom 00:00 og 23:59.</p>
                 <p id="pauseSoundError" role="status" hidden>Lydvarsel er utilgjengelig i nettleseren. Pause markeres visuelt.</p>
-                <div class="actions two">
+                <div class="actions two pause-actions">
                     <button class="btn primary" id="pauseSave">Lagre pauser</button>
                     <button class="btn" id="pauseReset">↻ Nullstill</button>
+                    <p id="pauseSaveStatus" class="pause-save-status" role="status" aria-live="polite" data-state="empty">Ingen pauser lagret</p>
                 </div>
             </section>
             <section class="pane" id="helikopter" aria-label="Helikoptervarsling" hidden inert>

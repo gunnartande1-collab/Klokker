@@ -28,35 +28,53 @@ function playSignal(notes, tones) {
  }
  return true;
 }
-const state={metro:{running:false,mode:'voksen',bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],options:{countSound:true,pauseSound:true},pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
-const modes={voksen:110,nyfodt:120};
+const state={metro:{running:false,bpm:110,anchor:0,step:0},count:{running:false,remaining:0,initial:0,end:0,finished:false,paused:false},stop:{running:false,elapsed:0,start:0},breaths:[],pauses:[],heli:{start:null,lastAlarm:null,acknowledged:false}};
 const tabs = [...tool.querySelectorAll('[data-tab]')];
 const panes = $('clockPanes');
 const toolPanels = [...panes.querySelectorAll('.pane')];
-const toggleFloatingPane = $('toggleFloatingPane');
 let floatingWindow = null;
-const defaultStripHeight = 80;
-const maximumPanelHeight = 230;
+let floatingLayoutObserver = null;
+const defaultStripHeight = 92;
 let collapsedFloatingHeight = defaultStripHeight;
-
 const floatingTime = $('floatingTime');
 const floatingDate = $('floatingDate');
 const osloTime = new Intl.DateTimeFormat('nb-NO', {
  timeZone:'Europe/Oslo', hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'
 });
 const osloDate = new Intl.DateTimeFormat('nb-NO', {
- timeZone:'Europe/Oslo', day:'numeric', month:'long', year:'numeric'
+ timeZone:'Europe/Oslo', day:'numeric', month:'numeric', year:'numeric'
 });
 let displayedSecond;
+function fitFloatingClock() {
+ if (!floatingWindow || floatingTime.ownerDocument !== floatingWindow.document) return;
+ const clock = $('floatingClock');
+ if (clock.hidden) return;
+ const width = clock.clientWidth - 6;
+ const height = clock.clientHeight - 2;
+ if (width <= 0 || height <= 0) return;
+
+ const dateFont = Math.min(15, Math.max(10, width / 13));
+ floatingDate.style.fontSize = `${dateFont.toFixed(1)}px`;
+ const availableHeight = height - dateFont - 2;
+ const context = floatingWindow.document.createElement('canvas').getContext('2d');
+ if (!context) return;
+ const style = floatingWindow.getComputedStyle(floatingTime);
+ context.font = `${style.fontWeight} 100px ${style.fontFamily}`;
+ const timeText = floatingTime.textContent || '23:59:59';
+ // Ta høyde for bokstavmellomrom i tillegg til målt skriftbredde.
+ const relativeWidth = context.measureText(timeText).width / 100 - (timeText.length - 1) * .02;
+ const fontSize = Math.min(64, availableHeight, width / relativeWidth * .97);
+ floatingTime.style.fontSize = `${Math.max(15, fontSize).toFixed(1)}px`;
+}
 function renderFloatingClock(now) {
- if (!floatingWindow || Math.floor(now / 1000) === displayedSecond) return;
+ if (Math.floor(now / 1000) === displayedSecond) return;
  displayedSecond = Math.floor(now / 1000);
  floatingTime.textContent = osloTime.format(now).replace(/\./g, ':');
  floatingDate.textContent = osloDate.format(now);
+ fitFloatingClock();
 }
 let lastTool = tabs.find(button => button.classList.contains('active')).dataset.tab;
 let activeTool = lastTool;
-
 function tab(id) {
  activeTool = id;
  if (id) lastTool = id;
@@ -64,6 +82,7 @@ function tab(id) {
    const selected = button.dataset.tab === id;
    button.classList.toggle('active', selected);
    button.setAttribute('aria-selected', String(selected));
+   button.setAttribute('aria-expanded', String(selected));
  }
  for (const pane of toolPanels) {
    pane.hidden = pane.id !== id;
@@ -72,12 +91,8 @@ function tab(id) {
  if (floatingWindow) {
    panes.hidden = !id;
    tool.classList.toggle('floating-expanded', !!id);
-   toggleFloatingPane.textContent = id ? 'Kollaps' : 'Utvid';
-   toggleFloatingPane.setAttribute('aria-expanded', String(!!id));
-   toggleFloatingPane.setAttribute('aria-label', id ? 'Skjul verktøypanelet' : 'Vis sist brukte verktøy');
  }
 }
-
 function panelOpensAbove(popup) {
  const {screenY, outerHeight, screen} = popup;
  const {availTop, availHeight} = screen;
@@ -85,24 +100,26 @@ function panelOpensAbove(popup) {
  const railCenter = screenY + (outerHeight || popup.innerHeight) / 2;
  return railCenter > availTop + availHeight / 2;
 }
-
+function resizeFloatingToContent() {
+ if (!floatingWindow) return;
+ const activePane = activeTool ? $(activeTool) : null;
+ const panelHeight = activePane ? Math.ceil(activePane.scrollHeight + 2) : 0;
+ const availableHeight = Math.max(defaultStripHeight, (floatingWindow.screen.availHeight || 900) - 24);
+ const targetHeight = Math.min(availableHeight, collapsedFloatingHeight + panelHeight);
+ const difference = Math.round(targetHeight - floatingWindow.innerHeight);
+ try {
+   if (Math.abs(difference) > 2) floatingWindow.resizeBy(0, difference);
+ } catch {
+   // Enkelte nettlesere begrenser vindusstørrelsen.
+ }
+}
 function toggleTool(id) {
- const wasOpen = !!activeTool;
- if (floatingWindow && !wasOpen && id) {
+ if (floatingWindow && !activeTool && id) {
    collapsedFloatingHeight = floatingWindow.innerHeight;
    tool.classList.toggle('floating-panel-above', panelOpensAbove(floatingWindow));
  }
  tab(id);
- if (!floatingWindow || (!id && !wasOpen)) return;
- const availableHeight = floatingWindow.screen.availHeight;
- const limit = Math.min(maximumPanelHeight, Math.floor((availableHeight || 900) / 3));
- const panelHeight = id ? Math.min($(id).offsetHeight + 2, limit) : 0;
- const difference = collapsedFloatingHeight + panelHeight - floatingWindow.innerHeight;
- try {
-   if (difference) floatingWindow.resizeBy(0, difference);
- } catch {
-   // The browser can limit resizing. The window can still be resized manually.
- }
+ resizeFloatingToContent();
 }
 for (const button of tabs) {
  button.addEventListener('click', () => {
@@ -115,15 +132,12 @@ for (const button of tabs) {
    toggleTool(floatingWindow && activeTool === id ? null : id);
  });
 }
-toggleFloatingPane.addEventListener('click', () => toggleTool(activeTool ? null : lastTool));
-
 const floatingNotice = $('floatingNotice');
 const floatingError = $('floatingError');
 const floatingLaunch = $('openFloating');
 const clockStylesheet = document.querySelector('link[rel="stylesheet"]').href;
 const toolHome = tool.parentNode;
 const toolNext = tool.nextSibling;
-
 floatingLaunch.addEventListener('click', async () => {
  floatingError.hidden = true;
  if (!window.documentPictureInPicture || window.top !== window) {
@@ -135,17 +149,16 @@ floatingLaunch.addEventListener('click', async () => {
  }
  if (floatingWindow) return;
  floatingLaunch.disabled = true;
- if (state.options.countSound || state.options.pauseSound) getAudio();
+ getAudio();
  try {
    const popup = await window.documentPictureInPicture.requestWindow({
-     width: Math.min(720, Math.round(window.screen.availWidth * .9)),
+     width: Math.min(840, Math.max(320, Math.round(window.screen.availWidth - 24))),
      height: defaultStripHeight
    });
    floatingWindow = popup;
    const popupDocument = popup.document;
    popupDocument.documentElement.lang = document.documentElement.lang;
-   popupDocument.title = 'OPSIX Klokkeverktøy';
-
+   popupDocument.title = 'OPSIX Operatørverktøy';
    const stylesheet = popupDocument.createElement('link');
    stylesheet.rel = 'stylesheet';
    stylesheet.href = clockStylesheet;
@@ -156,13 +169,17 @@ floatingLaunch.addEventListener('click', async () => {
    });
    popup.addEventListener('pagehide', () => {
      if (floatingWindow !== popup) return;
+     floatingLayoutObserver?.disconnect();
+     floatingLayoutObserver = null;
      floatingWindow = null;
+     displayedSecond = undefined;
+     floatingTime.style.removeProperty('font-size');
+     floatingDate.style.removeProperty('font-size');
      if (tool.ownerDocument !== popupDocument) return;
      tool.classList.remove('floating-expanded', 'floating-panel-above');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
-     toggleFloatingPane.hidden = true;
-     $('floatingClock').hidden = true;
+     tool.querySelector('.top').insertBefore($('floatingClock'), tool.querySelector('.header-actions'));
      floatingNotice.hidden = true;
      tab(lastTool);
      runClockUpdates(window);
@@ -170,17 +187,23 @@ floatingLaunch.addEventListener('click', async () => {
    }, {once:true});
    popupDocument.head.append(stylesheet);
    if (!(await stylesheetReady) || popup.closed || floatingWindow !== popup) return;
-
    popupDocument.body.classList.add('floating-clocks');
    syncFloatingAppearance();
    tab(null);
-   toggleFloatingPane.hidden = false;
-   $('floatingClock').hidden = false;
-   renderFloatingClock(Date.now());
+   tabs[0].parentNode.insertBefore($('floatingClock'), tabs[0]);
    popupDocument.body.append(tool);
+   displayedSecond = undefined;
+   renderFloatingClock(Date.now());
    floatingNotice.hidden = false;
+   if (popup.ResizeObserver) {
+     floatingLayoutObserver = new popup.ResizeObserver(() => {
+       fitFloatingClock();
+       if (activeTool) resizeFloatingToContent();
+     });
+     floatingLayoutObserver.observe($('floatingClock'));
+     for (const pane of toolPanels) floatingLayoutObserver.observe(pane);
+   }
    runClockUpdates(popup);
-   tabs[0].focus();
  } catch {
    floatingWindow?.close();
    floatingError.textContent = 'Kunne ikke åpne flytende verktøy. Du kan fortsette å bruke denne fanen.';
@@ -190,7 +213,6 @@ floatingLaunch.addEventListener('click', async () => {
  }
 });
 $('returnFloating').addEventListener('click', () => floatingWindow?.close());
-
 function syncFloatingAppearance() {
  if (!floatingWindow) return;
  floatingWindow.document.body.dataset.theme = document.body.dataset.theme;
@@ -210,7 +232,6 @@ settings.addEventListener('keydown', event => {
  showSettings(false);
  settingsToggle.focus();
 });
-
 const theme = $('theme');
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 function applyTheme() {
@@ -233,21 +254,29 @@ textSize.addEventListener('change', () => {
  syncFloatingAppearance();
  try { localStorage.setItem('opsix-clocks-text', textSize.value); } catch {}
 });
-function setMode(mode){const m=state.metro;m.mode=mode;m.bpm=modes[mode];$('metronomeHint').hidden=mode!=='nyfodt';tool.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===mode));$('bpmAdjust').hidden=mode==='nyfodt';$('bpmLabel').disabled=mode==='nyfodt';$('bpmLabel').title=mode==='nyfodt'?'Fast 3:1-rytme':'Klikk for å endre takt';$('bpmDirect').hidden=true;$('bpmLabel').hidden=false;updateBpmView();restartMetroCycle();$('ecgFourth').toggleAttribute('hidden',mode==='nyfodt');$('ecgVent').toggleAttribute('hidden',mode!=='nyfodt')}
-function updateBpmView(){const m=state.metro;$('bpmLabel').innerHTML=m.mode==='nyfodt'?'3:1 <span>HLR</span>':`${m.bpm} <span>BPM</span>`;$('bpmInput').value=m.bpm;$('bpmDirect').value=m.bpm}
+function updateBpmView() {
+ const bpm = state.metro.bpm;
+ $('bpmLabel').innerHTML = `${bpm} <span>BPM</span>`;
+ $('bpmInput').value = bpm;
+ $('bpmDirect').value = bpm;
+}
 function setBpm(value) {
- const metro = state.metro;
- if (metro.mode === 'nyfodt') return;
  const bpm = Number(value);
  if (Number.isSafeInteger(bpm) && bpm > 0) {
-   metro.bpm = bpm;
-   restartMetroCycle();
+  state.metro.bpm = bpm;
+  restartMetroCycle();
  }
  updateBpmView();
 }
-tool.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
-$('bpmDown').addEventListener('click',()=>setBpm(state.metro.bpm-1));$('bpmUp').addEventListener('click',()=>setBpm(state.metro.bpm+1));$('bpmInput').addEventListener('change',e=>setBpm(e.target.value));
-$('bpmLabel').addEventListener('click',()=>{if(state.metro.mode==='nyfodt')return;$('bpmLabel').hidden=true;$('bpmDirect').hidden=false;$('bpmDirect').focus();$('bpmDirect').select()});
+$('bpmDown').addEventListener('click',()=>setBpm(state.metro.bpm-1));
+$('bpmUp').addEventListener('click',()=>setBpm(state.metro.bpm+1));
+$('bpmInput').addEventListener('change',e=>setBpm(e.target.value));
+$('bpmLabel').addEventListener('click',()=>{
+ $('bpmLabel').hidden=true;
+ $('bpmDirect').hidden=false;
+ $('bpmDirect').focus();
+ $('bpmDirect').select();
+});
 function closeBpm(){setBpm($('bpmDirect').value);$('bpmDirect').hidden=true;$('bpmLabel').hidden=false}
 $('bpmDirect').addEventListener('keydown',e=>{if(e.key==='Enter')closeBpm();if(e.key==='Escape'){$('bpmDirect').hidden=true;$('bpmLabel').hidden=false}});$('bpmDirect').addEventListener('blur',()=>{if(!$('bpmDirect').hidden)closeBpm()});
 const metroTones = new Set();
@@ -285,7 +314,8 @@ $('metroStart').addEventListener('click', () => {
 });
 $('metroReset').addEventListener('click', () => {
  state.metro.running = false;
- setMode('voksen');
+ stopTones(metroTones);
+ setBpm(110);
  render();
 });
 function scheduleMetro() {
@@ -298,9 +328,8 @@ function scheduleMetro() {
  for (let scheduled = 0; scheduled < 8; scheduled++) {
    const when = metro.anchor + metro.step * interval;
    if (when >= now + .12) break;
-   const ventilation = metro.mode === 'nyfodt' && metro.step % 4 === 3;
-   const duration = Math.min(ventilation ? .16 : .065, Math.max(.012, interval * .7));
-   trackTone(metroTones, tone(when, ventilation ? 500 : 880, duration, ventilation ? .468 : .442));
+   const duration = Math.min(.065, Math.max(.012, interval * .7));
+   trackTone(metroTones, tone(when, 880, duration, .442));
    metro.step++;
  }
 }
@@ -316,7 +345,6 @@ function drawBeatCursor() {
  }
  clockFrame = clockWindow.requestAnimationFrame(drawBeatCursor);
 }
-
 function timeParts(id) {
  const group = $(id);
  const inputs = [...group.querySelectorAll('input')];
@@ -379,7 +407,6 @@ const countInput = timeParts('countDisplay');
 const baseTitle = document.title;
 const countTab = document.querySelector('[data-tab="nedtelling"]');
 const countBox = $('countBox');
-const countSoundButtons = tool.querySelectorAll('[data-setting="countSound"] button');
 for (const group of document.querySelectorAll('.adjustable-time')) {
  group.addEventListener('click', event => {
    const button = event.target.closest('[data-step]');
@@ -432,7 +459,7 @@ $('countStart').addEventListener('click', () => {
  }
  if (!countdown.remaining) return;
  clearCountAlert();
- if (state.options.countSound) getAudio();
+ getAudio();
  countdown.end = Date.now() + countdown.remaining;
  countdown.running = true;
  countdown.paused = false;
@@ -461,7 +488,6 @@ $('countReset').addEventListener('click', () => {
  $('countError').hidden = true;
  render();
 });
-for(const holder of document.querySelectorAll('[data-setting]'))holder.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const opt=holder.dataset.setting;state.options[opt]=b.dataset.value==='yes';if(opt==='pauseSound'){if(state.options.pauseSound) unlockPauseAudio();else stopTones(pauseTones)}render();holder.querySelectorAll('button').forEach(other=>{const sel=other===b;other.classList.toggle('selected',sel);other.setAttribute('aria-pressed',String(sel))})}));
 $('stopStart').addEventListener('click', () => {
  const stopwatch = state.stop;
  const now = Date.now();
@@ -479,21 +505,17 @@ $('stopReset').addEventListener('click', () => {
 });
 $('breathTap').addEventListener('click',()=>{state.breaths.push(Date.now());render()});$('breathUndo').addEventListener('click',()=>{state.breaths.pop();render()});$('breathReset').addEventListener('click',()=>{state.breaths=[];render()});
 const pauseFields = [['Matpause', timeParts('mealTime')], ['Skjermpause', timeParts('screenTime')]];
-const pauseSoundButtons = tool.querySelectorAll('[data-setting="pauseSound"] button');
 const pendingPauseAlarms = new Set();
 const pauseSignalLimit = 3;
 let pauseAlarmStarted = null;
 let pauseSoundSlot = -1;
-
 async function unlockPauseAudio() {
- if (!state.options.pauseSound) return;
  const context = getAudio(false);
  try {
    if (context && context.state !== 'running') await context.resume();
  } catch {}
- $('pauseSoundError').hidden = context?.state === 'running' || !state.options.pauseSound;
+ $('pauseSoundError').hidden = context?.state === 'running';
 }
-
 function savePause(type, field, parts, now) {
  const [hours, minutes] = parts;
  const date = new Date(now);
@@ -506,29 +528,61 @@ function savePause(type, field, parts, now) {
  state.pauses = state.pauses.filter(pause => pause.field !== field);
  state.pauses.push({type, field, time, label, triggered:false});
 }
-
-for (const [type, field] of pauseFields) {
+// Pauser aktiveres bare ved eksplisitt lagring. Statusen følger av hva som
+// er skrevet i feltene sammenlignet med aktive varsler i minnet.
+function renderPauseSaveStatus(due = pendingPauseAlarms.size > 0) {
+ const unsaved = pauseFields.some(([, field]) => {
+   const value = field.value() === ':' ? '' : field.value();
+   const saved = state.pauses.find(pause => pause.field === field)?.label ?? '';
+   return value !== saved;
+ });
+ const status = $('pauseSaveStatus');
+ let kind = 'empty';
+ let message = 'Ingen pauser lagret';
+ if (unsaved) {
+   kind = 'pending';
+   message = state.pauses.length
+     ? 'Endringer ikke lagret – tidligere varsler gjelder.'
+     : 'Ikke lagret – trykk «Lagre pauser».';
+ } else if (state.pauses.length) {
+   kind = 'saved';
+   message = '✓ Lagret: ' + pauseFields
+     .map(([type, field]) => {
+       const pause = state.pauses.find(entry => entry.field === field);
+       return pause ? `${type === 'Matpause' ? 'Mat' : 'Skjerm'} ${pause.label}` : null;
+     }).filter(Boolean).join(' · ');
+ }
+ if (status.dataset.state !== kind) status.dataset.state = kind;
+ if (status.textContent !== message) status.textContent = message;
+ const badge = $('pauseBadge');
+ const badgeText = due ? 'NÅ' : '';
+ if (badge.textContent !== badgeText) badge.textContent = badgeText;
+ badge.hidden = !badgeText;
+}
+for (const [, field] of pauseFields) {
  field.group.addEventListener('input', () => {
    $('pauseError').hidden = true;
-   if (!/^\d{2}:\d{2}$/.test(field.value())) return;
-   const parts = field.read({requireAll:true, silent:true});
-   if (!parts) return;
-   unlockPauseAudio();
-   savePause(type, field, parts, Date.now());
-   render();
+   renderPauseSaveStatus();
  });
 }
-
 $('pauseSave').addEventListener('click', () => {
  const now = Date.now();
  const entries = [];
  for (const [type, field] of pauseFields) {
-   const parts = field.value() === ':' ? [] : field.read({requireAll:true});
+   const parts = field.value() === ':' ? [] : field.read();
    if (!parts) {
+     $('pauseError').textContent = 'Skriv gyldig klokkeslett mellom 00:00 og 23:59.';
      $('pauseError').hidden = false;
+     renderPauseSaveStatus();
      return;
    }
    entries.push([type, field, parts]);
+ }
+ if (!entries.some(([, , parts]) => parts.length)) {
+   $('pauseError').textContent = 'Skriv inn minst ett klokkeslett før du lagrer.';
+   $('pauseError').hidden = false;
+   renderPauseSaveStatus();
+   return;
  }
  for (const [type, field, parts] of entries) {
    if (parts.length) {
@@ -537,6 +591,15 @@ $('pauseSave').addEventListener('click', () => {
    } else {
      state.pauses = state.pauses.filter(pause => pause.field !== field);
    }
+ }
+ // Tidligere aktive alarmer som ble erstattet, skal ikke fortsette å varsle.
+ for (const pause of pendingPauseAlarms) {
+   if (!state.pauses.includes(pause)) pendingPauseAlarms.delete(pause);
+ }
+ if (!pendingPauseAlarms.size) {
+   pauseAlarmStarted = null;
+   pauseSoundSlot = -1;
+   stopTones(pauseTones);
  }
  $('pauseError').hidden = true;
  unlockPauseAudio();
@@ -572,20 +635,17 @@ function renderPauses(now) {
      pendingPauseAlarms.clear();
      pauseAlarmStarted = null;
      stopTones(pauseTones);
-   } else if (state.options.pauseSound && slot > pauseSoundSlot && playSignal(pauseSignal, pauseTones)) {
+   } else if (slot > pauseSoundSlot && playSignal(pauseSignal, pauseTones)) {
      pauseSoundSlot = slot;
    }
  }
  const due = pendingPauseAlarms.size > 0;
  $('pauseBox').classList.toggle('pause-due', due);
  tool.querySelector('[data-tab="pause"]').classList.toggle('pause-due', due);
- for (const button of pauseSoundButtons) button.disabled = due && state.options.pauseSound;
- $('pauseBadge').hidden = !due;
- $('pauseBadge').textContent = due ? 'NÅ' : '';
+ renderPauseSaveStatus(due);
  const message = due ? [...new Set([...pendingPauseAlarms].map(pause => pause.type))].join(' + ') + ' nå' : '';
  if ($('pauseState').textContent !== message) $('pauseState').textContent = message;
 }
-
 const defaultLandingDuration = 180000;
 const defaultLandingWarning = 90000;
 const landingDuration = timeParts('heliDuration');
@@ -698,7 +758,7 @@ function renderLanding() {
  $('heliStart').hidden = alert;
  heliTab.classList.toggle('heli-alert', alert);
  $('heliBadge').hidden = !active;
- $('heliBadge').textContent = alert ? 'VARSLING' : time;
+ $('heliBadge').textContent = time;
  return active ? time : '';
 }
 $('feedbackButton').addEventListener('click',()=>{window.open(CONFIG.feedbackUrl,'_blank','noopener')});
@@ -707,9 +767,7 @@ function confirmBeforeLeaving(event) {
  event.preventDefault();
  event.returnValue = '1';
 }
-
 window.addEventListener('beforeunload', confirmBeforeLeaving);
-
 function updateActiveClockIndicator(now) {
  const {metro, count, stop, heli, pauses} = state;
  const pausedCountdown = count.paused && count.remaining > 0;
@@ -718,18 +776,16 @@ function updateActiveClockIndicator(now) {
    pausedCountdown || count.finished || stop.running || stop.elapsed > 0 || hasPendingPause || pendingPauseAlarms.size > 0;
  document.documentElement.toggleAttribute('data-opsix-active-clock', hasActiveClock);
 }
-
 function updateClockButton(id, label) {
  const button = $(id);
  if (button.textContent !== label) button.textContent = label;
 }
-
 function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  if (c.running && remaining() <= 0) finishCountdown();
  const displayedTime = formatCountdown(remaining());
  if (!c.edited && countInput.value() !== displayedTime) countInput.write(displayedTime);
  countInput.readOnly(c.running || c.finished);
- if (c.finished && state.options.countSound && (c.lastAlarm === null || now - c.lastAlarm >= alertRepeat)) {
+ if (c.finished && (c.lastAlarm === null || now - c.lastAlarm >= alertRepeat)) {
    if (playSignal(countdownSignal, countTones)) c.lastAlarm = now;
  }
  const countMessage = c.running ? 'Nedtelling pågår' : c.paused ? 'Pauset' : '';
@@ -739,7 +795,12 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  $('countBox').classList.toggle('finished', countAlert);
  countTab.classList.toggle('count-finished', countAlert);
  const elapsed=s.elapsed+(s.running?now-s.start:0);$('stopDisplay').textContent=fmtStop(elapsed);
- $('countBadge').hidden=!c.running;$('countBadge').textContent=c.running?displayedTime:'';$('stopBadge').hidden=!s.running;$('stopBadge').textContent=fmtStop(elapsed);
+ const showCountdown = c.running || c.paused || c.finished;
+ $('countBadge').hidden = !showCountdown;
+ $('countBadge').textContent = showCountdown ? displayedTime : '';
+ const showStopwatch = s.running || elapsed > 0;
+ $('stopBadge').hidden = !showStopwatch;
+ $('stopBadge').textContent = showStopwatch ? fmtStop(elapsed) : '';
  $('breathUndo').disabled = !state.breaths.length;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
@@ -752,7 +813,6 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  updateClockButton('countStart', c.running ? 'Ⅱ Pause' : c.paused ? '▶ Fortsett' : '▶ Start');
  updateClockButton('stopStart', s.running ? 'Ⅱ Pause' : s.elapsed > 0 ? '▶ Fortsett' : '▶ Start');
  $('countStart').disabled = c.finished;
- for (const button of countSoundButtons) button.disabled = c.finished && state.options.countSound;
  renderFloatingClock(now);
  const landingTime = renderLanding();
  const title = c.running ? formatCountdown(remaining()) + ' | Nedtelling'
@@ -773,7 +833,6 @@ function runClockUpdates(target) {
 }
 document.addEventListener('visibilitychange', render);
 window.addEventListener('focus', render);
-
-setMode('voksen');
+updateBpmView();
 runClockUpdates(window);
 })();
