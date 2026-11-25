@@ -8,8 +8,8 @@
     <link rel="icon" href="opsix-x-192.png" sizes="192x192" type="image/png">
     <link rel="apple-touch-icon" href="opsix-x-192.png">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="klokker.css?v=20261124-3">
-    <script src="klokker.js?v=20261124-3" defer></script>
+    <link rel="stylesheet" href="klokker.css?v=20261125-1">
+    <script src="klokker.js?v=20261125-1" defer></script>
 </head>
 <body data-theme="natt">
     <section class="tool floating-notice" id="floatingNotice" aria-labelledby="floatingNoticeTitle" hidden>
@@ -21,10 +21,6 @@
         <header class="top">
             <div class="brand-title">
                 <strong>Operatørverktøy</strong>
-            </div>
-            <div class="floating-clock" id="floatingClock">
-                <time id="floatingTime" aria-label="Norsk tid"></time>
-                <time id="floatingDate"></time>
             </div>
             <div class="header-actions">
                 <button id="openFloating" class="icon-button" type="button" title="Flytende knapper" aria-label="Åpne flytende knapper">
@@ -62,6 +58,10 @@
             </select>
         </div>
         <nav class="tabs" aria-label="Verktøylinje">
+            <div class="floating-clock" id="floatingClock" hidden>
+                <time id="floatingTime" aria-label="Norsk tid"></time>
+                <time id="floatingDate"></time>
+            </div>
             <button class="tab" data-tab="metronom" aria-selected="false">
                 <span class="tab-symbol brand-small" aria-hidden="true">
                     <svg viewBox="0 0 48 48" fill="none">
@@ -124,7 +124,7 @@
                 </div>
                 <div class="metro-controls">
                     <div class="adjuster" id="bpmAdjust">
-                        <label for="bpmInput">Juster takt</label>
+                        <label for="bpmInput">Takt (BPM)</label>
                         <div>
                             <button id="bpmDown" type="button" aria-label="Reduser BPM">−</button>
                             <input id="bpmInput" type="number" inputmode="numeric" min="1" step="1" value="110">
@@ -184,23 +184,18 @@
                 </div>
             </section>
             <section class="pane" id="pusteteller" aria-label="Pusteteller">
-                <p class="subtitle">
-                    Estimat etter minimum 2 pust og 10 sekunder.
-                </p>
                 <div class="display breath-display" id="breathBox">
                     <strong id="breathCount">0</strong>
                     <span>Registrerte pust</span>
-                    <div class="breath-result">
-                        Anslått RF
-                        <b id="breathRate">–</b>
-                        <span>/min</span>
+                    <div class="breath-result" id="breathResult" role="status" aria-live="polite" aria-atomic="true">
+                        Registrer minst 2 pust og 10 sekunder for beregning
                     </div>
                     <span class="observation" id="breathTime">Observasjon 00:00 / 01:00</span>
                 </div>
-                <button type="button" class="btn primary big-breath" id="breathTap">+ Registrer pust</button>
+                <button type="button" class="btn primary big-breath" id="breathTap">Registrer pust</button>
                 <div class="actions two">
-                    <button id="breathUndo" class="btn" type="button" disabled>− Fjern siste pust</button>
-                    <button id="breathReset" class="btn">↻ Nullstill</button>
+                    <button id="breathUndo" class="btn neutral-dark" type="button" disabled>Fjern siste</button>
+                    <button id="breathReset" class="btn danger" type="button">Nullstill</button>
                 </div>
             </section>
             <section class="pane" id="pause" aria-label="Pause" hidden inert>

@@ -67,7 +67,7 @@ function fitFloatingClock() {
  floatingTime.style.fontSize = `${Math.max(15, fontSize).toFixed(1)}px`;
 }
 function renderFloatingClock(now) {
- if (Math.floor(now / 1000) === displayedSecond) return;
+ if (!floatingWindow || Math.floor(now / 1000) === displayedSecond) return;
  displayedSecond = Math.floor(now / 1000);
  floatingTime.textContent = osloTime.format(now).replace(/\./g, ':');
  floatingDate.textContent = osloDate.format(now);
@@ -179,7 +179,7 @@ floatingLaunch.addEventListener('click', async () => {
      tool.classList.remove('floating-expanded', 'floating-panel-above');
      toolHome.insertBefore(tool, toolNext);
      panes.hidden = false;
-     tool.querySelector('.top').insertBefore($('floatingClock'), tool.querySelector('.header-actions'));
+     $('floatingClock').hidden = true;
      floatingNotice.hidden = true;
      tab(lastTool);
      runClockUpdates(window);
@@ -190,7 +190,7 @@ floatingLaunch.addEventListener('click', async () => {
    popupDocument.body.classList.add('floating-clocks');
    syncFloatingAppearance();
    tab(null);
-   tabs[0].parentNode.insertBefore($('floatingClock'), tabs[0]);
+   $('floatingClock').hidden = false;
    popupDocument.body.append(tool);
    displayedSecond = undefined;
    renderFloatingClock(Date.now());
@@ -805,7 +805,11 @@ function render(){const now=Date.now(),m=state.metro,c=state.count,s=state.stop;
  let b=state.breaths,age=b.length?now-b[0]:0;$('breathCount').textContent=b.length;$('breathTime').textContent=`Observasjon ${fmtCount(age)} / 01:00`;
  // Et intervallbasert anslag, ikke antall pust x 60/sekunder siden første pust.
  const hasBreathEstimate = b.length >= 2 && age >= 10000 && b[b.length - 1] > b[0];
- $('breathRate').textContent = hasBreathEstimate ? Math.round(60000 * (b.length - 1) / (b[b.length - 1] - b[0])) : '–';
+ const resultText = hasBreathEstimate
+   ? `Anslått RF ${Math.round(60000 * (b.length - 1) / (b[b.length - 1] - b[0]))}/min`
+   : 'Registrer minst 2 pust og 10 sekunder for beregning';
+ const breathResult = $('breathResult');
+ if (breathResult.textContent.trim() !== resultText) breathResult.textContent = resultText;
  $('breathBox').classList.toggle('observed', age >= 60000);
  renderPauses(now);
  updateActiveClockIndicator(now);
